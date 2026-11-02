@@ -6,47 +6,6 @@ The image `eaeoz/protonvpn-docker:1` is an **All-in-One** container: it bundles 
 
 ---
 
-## ⚡ Instant Run (Single `docker run` Command)
-
-First, make sure the required folders exist:
-
-```bash
-mkdir -p ovpn config state
-```
-
-### Windows (PowerShell) - Single Line:
-```powershell
-docker run -d --name protonvpn --cap-add=NET_ADMIN --device=/dev/net/tun -p 8000:8000 -p 8080:80 -v "${PWD}/ovpn:/site/ovpn" -v "${PWD}/config:/site/config" -v "${PWD}/state:/site/state" --dns 8.8.8.8 --dns 1.1.1.1 --restart unless-stopped eaeoz/protonvpn-docker:1
-
-# Optional proof page (exit IP verification) - attaches to the running vpn, no other files needed:
-docker run -d --name protonvpn-proof --network container:protonvpn --restart unless-stopped eaeoz/protonvpn-docker-proof:1
-```
-
-### Windows (CMD) - Single Line:
-```cmd
-docker run -d --name protonvpn --cap-add=NET_ADMIN --device=/dev/net/tun -p 8000:8000 -p 8080:80 -v "%cd%/ovpn:/site/ovpn" -v "%cd%/config:/site/config" -v "%cd%/state:/site/state" --dns 8.8.8.8 --dns 1.1.1.1 --restart unless-stopped eaeoz/protonvpn-docker:1
-
-docker run -d --name protonvpn-proof --network container:protonvpn --restart unless-stopped eaeoz/protonvpn-docker-proof:1
-```
-
-### Linux / macOS (Bash) - Single Line:
-```bash
-docker run -d --name protonvpn --cap-add=NET_ADMIN --device=/dev/net/tun -p 8000:8000 -p 8080:80 -v "$(pwd)/ovpn:/site/ovpn" -v "$(pwd)/config:/site/config" -v "$(pwd)/state:/site/state" --dns 8.8.8.8 --dns 1.1.1.1 --restart unless-stopped eaeoz/protonvpn-docker:1
-
-docker run -d --name protonvpn-proof --network container:protonvpn --restart unless-stopped eaeoz/protonvpn-docker-proof:1
-```
-
-👉 Now open **[http://localhost:8000](http://localhost:8000)** in your browser!
-- Enter your ProtonVPN OpenVPN username/password directly into the web UI.
-- Drag & drop `.ovpn` files to upload new servers.
-- Switch your active server with one click ("Use as default").
-- Control the tunnel with **Restart Tunnel**, **Stop Tunnel** and **Start Tunnel** buttons.
-- Monitor your live exit IP, Country, City, and ISP.
-
-> **Routing Other Containers:** To route another container through this VPN tunnel, add `--net=container:protonvpn` to that container's `docker run` command.
-
----
-
 ## ⚡ Instant Run (Pre-Built `docker compose`)
 
 If you want the VPN gateway along with the verification proof page, create a `docker-compose.yml` file:
@@ -125,6 +84,17 @@ docker compose up -d
 
 - **Control Panel**: [http://localhost:8000](http://localhost:8000)
 - **Proof Page**: [http://localhost:8080](http://localhost:8080)
+
+---
+
+👉 Now open **[http://localhost:8000](http://localhost:8000)** in your browser!
+- Enter your ProtonVPN OpenVPN username/password directly into the web UI.
+- Drag & drop `.ovpn` files to upload new servers.
+- Switch your active server with one click ("Use as default").
+- Control the tunnel with **Restart Tunnel**, **Stop Tunnel** and **Start Tunnel** buttons.
+- Monitor your live exit IP, Country, City, and ISP.
+
+> **Routing Other Containers:** To route another container through this VPN tunnel, add `--net=container:protonvpn` to that container's `docker run` command.
 
 ---
 
