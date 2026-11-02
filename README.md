@@ -55,26 +55,28 @@ If you want the VPN gateway along with the verification proof page, create a `do
 name: protonvpn-docker
 
 services:
+  # ------------------------------------------------------------------
+  # The OpenVPN tunnel gateway
+  # ------------------------------------------------------------------
   vpn:
-    image: eaeoz/protonvpn-docker:1
+    image: eaeoz/protonvpn-docker:latest
     container_name: protonvpn
     cap_add:
       - NET_ADMIN
     devices:
       - /dev/net/tun:/dev/net/tun
-    ports:
-      - "8000:8000"   # Embedded Web Control Panel
-      - "8080:80"     # Proof Page (shared netns)
     volumes:
       - ./config:/site/config
       - ./ovpn:/site/ovpn
       - ./state:/site/state
+    environment:
+      DEFAULT_OVPN: ${DEFAULT_OVPN:-}
     dns:
       - 8.8.8.8
       - 1.1.1.1
+    ports:
+      - "8080:80"   # Proof page (web service attaches to vpn netns)
     healthcheck:
-      # healthy when the tunnel is up OR when it was deliberately stopped
-      # from the panel (state/tunnel-stopped persists until Start is pressed)
       test: ["CMD-SHELL", "test -f /run/tunnel-up || test -f /site/state/tunnel-stopped"]
       interval: 30s
       timeout: 5s
@@ -82,16 +84,37 @@ services:
       retries: 3
     restart: unless-stopped
 
-  # Optional: proof page that proves web traffic exits through the VPN tunnel.
-  # Fully self-contained image (page + IP updater baked in) - no host files needed.
-  proof:
+  # ------------------------------------------------------------------
+  # Control panel: web UI (profile picker + tunnel status + reconnect)
+  # ------------------------------------------------------------------
+  panel:
+    image: eaeoz/protonvpn-docker-panel:latest
+    container_name: protonvpn-panel
+    depends_on:
+      - vpn
+    environment:
+      DEFAULT_OVPN: ${DEFAULT_OVPN:-}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ovpn:/app/ovpn
+      - ./state:/app/state
+      - ./www:/app/www:ro
+      - ./config:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+  # ------------------------------------------------------------------
+  # Proof container: shares VPN network to verify exit IP.
+  # Fully self-contained image (page + updater baked in).
+  # ------------------------------------------------------------------
+  web:
     image: eaeoz/protonvpn-docker-proof:1
     depends_on:
-      vpn:
-        condition: service_started
+      - vpn
     network_mode: "service:vpn"
     volumes:
-      - ./state:/site/state   # optional: live "current profile" name
+      - ./state:/site/state      # optional: live "current profile" name
     restart: unless-stopped
 ```
 
