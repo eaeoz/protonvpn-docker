@@ -2,31 +2,31 @@
 
 A production-ready Dockerized ProtonVPN gateway featuring a **hot-swappable OpenVPN tunnel**, an **embedded Web Control Panel**, and an **independent verification Proof Page** with real-time external IP and geolocation telemetry.
 
-The image `eaeoz/protonvpn-docker` is an **All-in-One** container: it bundles both the OpenVPN tunnel and the Web UI. A single `docker run` command starts the VPN tunnel and serves the full interactive dashboard on port 8000!
+The image `eaeoz/protonvpn-docker:3` is an **All-in-One** container: it bundles both the OpenVPN tunnel and the Web UI. A single `docker run` command starts the VPN tunnel and serves the full interactive dashboard on port 8000!
 
 ---
 
 ## ⚡ Instant Run (Single `docker run` Command)
 
-Start the VPN tunnel gateway and the Web Control Panel in one command:
+First, make sure the required folders exist:
 
 ```bash
-# 1. Create local directories for your credentials, profiles, and state
 mkdir -p ovpn config state
+```
 
-# 2. Run the all-in-one container
-docker run -d \
-  --name protonvpn \
-  --cap-add=NET_ADMIN \
-  --device=/dev/net/tun \
-  -p 8000:8000 \
-  -v "$(pwd)/ovpn:/site/ovpn" \
-  -v "$(pwd)/config:/site/config" \
-  -v "$(pwd)/state:/site/state" \
-  --dns 8.8.8.8 \
-  --dns 1.1.1.1 \
-  --restart unless-stopped \
-  eaeoz/protonvpn-docker:2
+### Windows (PowerShell) - Single Line:
+```powershell
+docker run -d --name protonvpn --cap-add=NET_ADMIN --device=/dev/net/tun -p 8000:8000 -v "${PWD}/ovpn:/site/ovpn" -v "${PWD}/config:/site/config" -v "${PWD}/state:/site/state" --dns 8.8.8.8 --dns 1.1.1.1 --restart unless-stopped eaeoz/protonvpn-docker:3
+```
+
+### Windows (CMD) - Single Line:
+```cmd
+docker run -d --name protonvpn --cap-add=NET_ADMIN --device=/dev/net/tun -p 8000:8000 -v "%cd%/ovpn:/site/ovpn" -v "%cd%/config:/site/config" -v "%cd%/state:/site/state" --dns 8.8.8.8 --dns 1.1.1.1 --restart unless-stopped eaeoz/protonvpn-docker:3
+```
+
+### Linux / macOS (Bash) - Single Line:
+```bash
+docker run -d --name protonvpn --cap-add=NET_ADMIN --device=/dev/net/tun -p 8000:8000 -v "$(pwd)/ovpn:/site/ovpn" -v "$(pwd)/config:/site/config" -v "$(pwd)/state:/site/state" --dns 8.8.8.8 --dns 1.1.1.1 --restart unless-stopped eaeoz/protonvpn-docker:3
 ```
 
 👉 Now open **[http://localhost:8000](http://localhost:8000)** in your browser!
@@ -42,16 +42,14 @@ docker run -d \
 
 ## ⚡ Instant Run (Pre-Built `docker compose`)
 
-If you prefer using Docker Compose with an optional sidecar Proof Page (which runs Nginx through the VPN netns on port 8080):
-
-Create a `docker-compose.yml` with:
+If you want the VPN gateway along with the verification proof page, create a `docker-compose.yml` file:
 
 ```yaml
 name: protonvpn-docker
 
 services:
   vpn:
-    image: eaeoz/protonvpn-docker:2
+    image: eaeoz/protonvpn-docker:3
     container_name: protonvpn
     cap_add:
       - NET_ADMIN
@@ -73,7 +71,8 @@ services:
   proof:
     image: nginx:alpine
     depends_on:
-      - vpn
+      vpn:
+        condition: service_started
     network_mode: "service:vpn"
     volumes:
       - ./www:/usr/share/nginx/html
@@ -168,7 +167,7 @@ To route another service (such as a torrent client, scraper, or curl script) thr
 ```yaml
 services:
   vpn:
-    image: eaeoz/protonvpn-docker:2
+    image: eaeoz/protonvpn-docker:3
     container_name: protonvpn
     cap_add:
       - NET_ADMIN
@@ -192,22 +191,17 @@ services:
 
 ---
 
-## 📦 Building & Publishing Version 2
-
-Run the following commands to tag and push the all-in-one image to Docker Hub:
+## 📦 Building & Publishing
 
 ```powershell
-# 1. Build the all-in-one image (includes OpenVPN + Web Control Panel)
-docker build -t eaeoz/protonvpn-docker:2 -f vpn/Dockerfile .
+# 1. Build all-in-one image
+docker build -t eaeoz/protonvpn-docker:3 -f vpn/Dockerfile .
 
 # 2. Tag as latest
-docker tag eaeoz/protonvpn-docker:2 eaeoz/protonvpn-docker:latest
+docker tag eaeoz/protonvpn-docker:3 eaeoz/protonvpn-docker:latest
 
-# 3. Log in to Docker Hub (if not already logged in)
-docker login
-
-# 4. Push to Docker Hub
-docker push eaeoz/protonvpn-docker:2
+# 3. Push to Docker Hub
+docker push eaeoz/protonvpn-docker:3
 docker push eaeoz/protonvpn-docker:latest
 ```
 

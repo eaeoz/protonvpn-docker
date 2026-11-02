@@ -13,8 +13,13 @@ import json
 import os
 import re
 import pathlib
-import docker
-from docker.errors import NotFound, DockerException
+try:
+    import docker
+    from docker.errors import NotFound, DockerException
+except ImportError:
+    docker = None
+    NotFound = Exception
+    DockerException = Exception
 from flask import Flask, request, redirect, url_for, render_template, flash
 
 OVPN_DIR = pathlib.Path("/app/ovpn")
@@ -40,10 +45,12 @@ SAFE_NAME_SIMPLE = re.compile(r"^[A-Za-z0-9._\-]+$")
 app = Flask(__name__)
 app.secret_key = "local-tool-not-secret"
 
-try:
-    _client = docker.from_env()
-except DockerException:
-    _client = None
+_client = None
+if docker is not None:
+    try:
+        _client = docker.from_env()
+    except DockerException:
+        _client = None
 
 
 def get_vpn_container():
@@ -73,11 +80,15 @@ def vpn_status():
         except Exception:
             pass
 
-    # 1. Check if running inside the vpn container directly (local /run/tunnel-up check)
-    if pathlib.Path("/run/tunnel-up").is_file():
-        return "running", "up", err
-    elif pathlib.Path("/run/openvpn.pid").is_file():
-        return "running", "connecting", err
+    # 1. Check if running inside the vpn container directly
+    # In the embedded image, the entrypoint script always touches /run/embedded-vpn
+    if pathlib.Path("/run/embedded-vpn").is_file():
+        if pathlib.Path("/run/tunnel-up").is_file():
+            return "running", "up", err
+        elif pathlib.Path("/run/openvpn.pid").is_file():
+            return "running", "connecting", err
+        else:
+            return "running", "down", err
 
     # 2. Otherwise query via docker client (when running as separate container)
     c = get_vpn_container()
@@ -102,14 +113,16 @@ def list_profiles():
 @app.route("/")
 def index():
     state, tunnel, err = vpn_status()
+    profiles = list_profiles()
     return render_template(
         "index.html",
-        profiles=list_profiles(),
+        profiles=profiles,
         selected=selected_profile(),
         container_state=state,
         tunnel=tunnel,
         tunnel_error=err,
         cred_saved=credentials_configured(),
+        no_profiles=(len(profiles) == 0),
     )
 
 

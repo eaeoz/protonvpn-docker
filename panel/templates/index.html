@@ -466,6 +466,25 @@
   {% endfor %}
 {% endwith %}
 
+<!-- Getting Started Guidance Banner when no profiles exist -->
+{% if no_profiles %}
+<div class="card" style="border: 1px solid var(--accent-purple); background: rgba(109, 74, 255, 0.08); padding: 1.4rem 1.6rem; margin-bottom: 1.5rem;">
+    <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.6rem; color: #a371f7; font-weight: 700; font-size: 1.05rem;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+        <span>Welcome! Getting Started with ProtonVPN</span>
+    </div>
+    <p style="font-size: 0.92rem; color: var(--text-primary); margin-bottom: 0.8rem;">
+        No OpenVPN profile has been added yet. Follow these quick steps to establish your secure tunnel:
+    </p>
+    <ol style="margin-left: 1.4rem; font-size: 0.88rem; color: var(--text-secondary); line-height: 1.7; margin-bottom: 0.8rem;">
+        <li>Download your <b>.ovpn profile</b> from <a href="https://account.protonvpn.com/downloads" target="_blank" style="color:var(--accent-blue); text-decoration:underline;">ProtonVPN Downloads</a> (Select GNU/Linux &amp; UDP).</li>
+        <li>Scroll down to the <b>Tunnel Profiles</b> section below and drag-and-drop the <code class="code-tag">.ovpn</code> file into the upload box.</li>
+        <li>Enter your <b>OpenVPN username and password</b> from <a href="https://account.protonvpn.com/account#openvpn" target="_blank" style="color:var(--accent-blue); text-decoration:underline;">Proton Account &rarr; OpenVPN Credentials</a> and click <b>Save Credentials</b>.</li>
+        <li>Click <b>Use as default</b> next to your profile. The tunnel will connect automatically in seconds!</li>
+    </ol>
+</div>
+{% endif %}
+
 <!-- Error / Warning Banner -->
 <div id="errorBanner" class="flash error" style="display: {{ 'flex' if tunnel_error else 'none' }}; flex-direction: column; align-items: flex-start; gap: 0.35rem; padding: 1rem 1.2rem; margin-bottom: 1.5rem;">
     <div style="display: flex; align-items: center; gap: 0.6rem; font-weight: 600;">

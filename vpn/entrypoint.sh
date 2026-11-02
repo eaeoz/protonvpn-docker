@@ -23,6 +23,16 @@ SELECTED="$STATE_DIR/selected.ovpn"
 TUNNEL_UP_MARKER="/run/tunnel-up"
 TUNNEL_DNS="${TUNNEL_DNS:-10.96.0.1}"   # decimal resolver Proton PUSHes (dhcp-option DNS)
 
+# Marker indicating this entrypoint is running inside this container
+mkdir -p /run
+touch /run/embedded-vpn
+
+# Seed proof files into /site/www if /site/www is mounted
+if [ -d /site/www ] && [ ! -f /site/www/index.html ] && [ -d /app/www_default ]; then
+    echo "[vpn] seeding default proof page files into /site/www…"
+    cp -r /app/www_default/* /site/www/ 2>/dev/null || true
+fi
+
 # ---------------------------------------------------------------- profile pick
 # Strip \r: host-side (Windows) editors/write tools end lines with CRLF and the
 # bind-mounted file carries it over, which breaks the -f file check below.
@@ -43,9 +53,10 @@ pick_profile() {
 # ------------------------------------------------------- start/switch the tunnel
 start_tunnel() {
     if ! pick_profile; then
-        echo "[vpn] ERROR: no .ovpn profile found in $CONFIG_DIR"
-        echo "      drop a profile there (or upload it at http://localhost:8000) and restart."
-        exit 1
+        echo "[vpn] WARNING: No .ovpn profile found in $CONFIG_DIR."
+        echo "      Web Control Panel is running at http://localhost:8000."
+        echo "      Upload a .ovpn profile or save credentials from the UI to establish the tunnel."
+        return 1
     fi
 
     echo "[vpn] using profile: $PROFILE"
@@ -138,16 +149,24 @@ if [ -f /app/app.py ]; then
 fi
 
 # ---------------------------------------------------------------- run
-start_tunnel || exit 1
+start_tunnel || true
 
 # PID1 must NEVER exit: hot-swaps are done by the watcher (which kills/restarts
 # openvpn), so waiting on the first openvpn pid would return and kill the
 # container (breaking the netns of containers sharing it). Instead, stay
-# resident and restart openvpn only if it dies on its own.
+# resident and restart openvpn only if it dies on its own or profile appears.
 while true; do
     sleep 15
-    if ! kill -0 "$(cat /run/openvpn.pid 2>/dev/null)" 2>/dev/null; then
-        echo "[vpn] openvpn exited unexpectedly, restarting tunnel…"
-        start_tunnel
+    if [ -f /run/openvpn.pid ]; then
+        if ! kill -0 "$(cat /run/openvpn.pid 2>/dev/null)" 2>/dev/null; then
+            echo "[vpn] openvpn exited unexpectedly, restarting tunnel…"
+            start_tunnel || true
+        fi
+    else
+        # If openvpn was not started yet (e.g. initial start with empty ovpn folder)
+        if pick_profile 2>/dev/null; then
+            echo "[vpn] profile detected, starting tunnel…"
+            start_tunnel || true
+        fi
     fi
 done
