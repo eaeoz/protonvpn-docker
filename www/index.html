@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ProtonVPN Tunnel Proof</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --bg-body: #0d1117;
+        --bg-card: #161b22;
+        --bg-subtle: #21262d;
+        --border-color: #30363d;
+        --border-muted: #21262d;
+        --text-primary: #f0f6fc;
+        --text-secondary: #8b949e;
+        --text-muted: #6e7681;
+        --accent-purple: #6d4aff;
+        --accent-blue: #58a6ff;
+        --color-success: #3fb950;
+        --color-success-bg: rgba(35, 134, 54, 0.15);
+        --color-success-border: #2ea043;
+        --radius-sm: 6px;
+        --radius-md: 10px;
+        --radius-lg: 14px;
+        --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.35);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+        font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+        background-color: var(--bg-body);
+        color: var(--text-primary);
+        max-width: 860px;
+        margin: 3rem auto;
+        padding: 0 1.25rem;
+        line-height: 1.5;
+    }
+
+    header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1.2rem;
+        border-bottom: 1px solid var(--border-color);
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .brand-title {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-size: 1.45rem;
+        font-weight: 700;
+    }
+
+    .brand-badge {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        padding: 0.2rem 0.55rem;
+        border-radius: var(--radius-sm);
+        background: linear-gradient(135deg, #6d4aff, #8f65ff);
+        color: #fff;
+    }
+
+    .card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 1.5rem 1.8rem;
+        margin-bottom: 1.5rem;
+        box-shadow: var(--shadow-card);
+    }
+
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        background: var(--bg-subtle);
+        border: 1px solid var(--border-color);
+        border-radius: 999px;
+        padding: 0.25rem 0.8rem;
+        font-size: 0.82rem;
+        color: var(--text-secondary);
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .ip-box {
+        background: var(--bg-subtle);
+        border: 1px solid var(--border-muted);
+        border-radius: var(--radius-md);
+        padding: 1.2rem 1.4rem;
+        margin: 0.8rem 0 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.8rem;
+    }
+
+    .ip {
+        font-size: 1.8rem;
+        font-weight: 700;
+        font-family: 'JetBrains Mono', monospace;
+        letter-spacing: -0.02em;
+    }
+
+    .ip.tunnel { color: #3fb950; }
+    .ip.browser { color: #58a6ff; }
+
+    .tag {
+        font-size: 0.78rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        padding: 0.2rem 0.55rem;
+        border-radius: 4px;
+    }
+    .tag-tunnel { background: var(--color-success-bg); color: #3fb950; border: 1px solid var(--color-success-border); }
+    .tag-browser { background: rgba(88, 166, 255, 0.15); color: #58a6ff; border: 1px solid rgba(88, 166, 255, 0.4); }
+
+    .geo-details {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+        background: rgba(22, 27, 34, 0.6);
+        border: 1px solid var(--border-muted);
+        border-radius: var(--radius-md);
+        padding: 0.9rem 1.1rem;
+    }
+    .geo-item {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+    }
+    .geo-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+    }
+    .geo-val {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .muted {
+        color: var(--text-secondary);
+        font-size: 0.88rem;
+    }
+
+    .code-tag {
+        background: var(--bg-subtle);
+        border: 1px solid var(--border-color);
+        padding: 0.15rem 0.4rem;
+        border-radius: 4px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.82rem;
+        color: #e6edf3;
+    }
+
+    footer {
+        margin-top: 2rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--border-muted);
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+        font-size: 0.88rem;
+    }
+
+    a {
+        color: var(--accent-blue);
+        text-decoration: none;
+        transition: color 0.15s;
+    }
+    a:hover {
+        text-decoration: underline;
+    }
+</style>
+</head>
+<body>
+
+    <header>
+        <div class="brand-title">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6d4aff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+            ProtonVPN Verification
+            <span class="brand-badge">Proof Mode</span>
+        </div>
+        <div class="muted">
+            Auto-refresh: 10s
+        </div>
+    </header>
+
+    <!-- Warning Banner for Tunnel Error / Cached State -->
+    <div id="proofWarning" style="display: none; background: rgba(218, 54, 51, 0.15); border: 1px solid #f85149; border-radius: var(--radius-md); padding: 1rem 1.25rem; margin-bottom: 1.5rem; color: #ffb4b0;">
+        <div style="font-weight: 700; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; color: #f85149;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            <span id="proofWarningTitle">Tunnel Reconnecting or Offline</span>
+        </div>
+        <p id="proofWarningText" style="font-size: 0.9rem; margin-bottom: 0.25rem;">
+            OpenVPN is currently disconnected or authentication failed.
+        </p>
+        <p style="font-size: 0.82rem; color: #d29922;">
+            ⚠️ The IP and location shown below are cached from your <b>previous connection session</b>. Outbound traffic is currently halted.
+        </p>
+    </div>
+
+    <!-- VPN Container Section -->
+    <div class="card">
+        <div class="card-header">
+            <h2 style="font-size: 1.1rem; font-weight: 600;">VPN Tunnel Gateway (Internal Container)</h2>
+            <span class="badge">profile: <span id="profile" style="color: #a371f7;">…</span></span>
+        </div>
+        
+        <div class="ip-box">
+            <span class="ip tunnel" id="ip-tunnel">fetching…</span>
+            <span class="tag tag-tunnel">Protected VPN IP</span>
+        </div>
+
+        <div class="geo-details" id="geo-tunnel">
+            <div class="geo-item">
+                <span class="geo-label">Country</span>
+                <span class="geo-val" id="t-country">Detecting…</span>
+            </div>
+            <div class="geo-item">
+                <span class="geo-label">City / Region</span>
+                <span class="geo-val" id="t-city">—</span>
+            </div>
+            <div class="geo-item">
+                <span class="geo-label">ISP / Organization</span>
+                <span class="geo-val" id="t-org">—</span>
+            </div>
+        </div>
+
+        <p class="muted">
+            Fetched by the NGINX web server directly with <code class="code-tag">wget</code> inside the container. 
+            Because this container uses <code class="code-tag">network_mode: "service:vpn"</code>, all traffic leaves exclusively through the OpenVPN tun interface.
+        </p>
+    </div>
+
+    <!-- Browser Host Section -->
+    <div class="card">
+        <div class="card-header">
+            <h2 style="font-size: 1.1rem; font-weight: 600;">Direct Browser Host Gateway</h2>
+            <span class="tag tag-browser">Direct Client ISP</span>
+        </div>
+
+        <div class="ip-box">
+            <span class="ip browser" id="ip-browser">fetching…</span>
+            <span class="muted" style="font-size:0.8rem;">Local Client Connection</span>
+        </div>
+
+        <div class="geo-details" id="geo-browser">
+            <div class="geo-item">
+                <span class="geo-label">Country</span>
+                <span class="geo-val" id="b-country">Detecting…</span>
+            </div>
+            <div class="geo-item">
+                <span class="geo-label">City / Region</span>
+                <span class="geo-val" id="b-city">—</span>
+            </div>
+            <div class="geo-item">
+                <span class="geo-label">ISP / Organization</span>
+                <span class="geo-val" id="b-org">—</span>
+            </div>
+        </div>
+
+        <p class="muted">
+            Fetched by your browser client outside Docker. If the two IPs and locations above are different, all network traffic in linked services is confirmed to be securely tunnelled through ProtonVPN.
+        </p>
+    </div>
+
+    <footer>
+        <div>
+            <a href="http://localhost:8000">&larr; Back to Control Panel</a>
+        </div>
+        <div class="muted">
+            ProtonVPN Dockerized Stack &middot; Local Proof Page
+        </div>
+    </footer>
+
+<script>
+async function refresh() {
+    // 0. Check panel status for tunnel state & errors if accessible
+    try {
+        const sResp = await fetch('http://' + window.location.hostname + ':8000/status', { cache: 'no-store' });
+        if (sResp.ok) {
+            const s = await sResp.json();
+            const wBox = document.getElementById('proofWarning');
+            const wTxt = document.getElementById('proofWarningText');
+            if (s.error || s.tunnel !== 'up') {
+                wBox.style.display = 'block';
+                wTxt.textContent = s.error || `Tunnel status is currently "${s.tunnel}". Traffic may be paused.`;
+            } else {
+                wBox.style.display = 'none';
+            }
+        }
+    } catch (_) {}
+
+    // 1. Fetch VPN Tunnel IP & Location from ipinfo.json generated inside container
+    try {
+        const resp = await fetch('ipinfo.json', { cache: 'no-store' });
+        if (resp.ok) {
+            const data = await resp.json();
+            if (data.ip && data.ip !== 'loading...' && data.ip !== 'error') {
+                document.getElementById('ip-tunnel').textContent = data.ip;
+                document.getElementById('t-country').textContent = data.country_name || data.country || 'Unknown';
+                document.getElementById('t-city').textContent = [data.city, data.region].filter(Boolean).join(', ') || '—';
+                document.getElementById('t-org').textContent = data.org || data.connection?.isp || data.asn || '—';
+            }
+        }
+    } catch (_) {
+        // Fallback to ip.txt if ipinfo.json not ready yet
+        fetch('ip.txt', { cache: 'no-store' }).then(r => r.text()).then(t => {
+            const val = t.trim();
+            if (val) document.getElementById('ip-tunnel').textContent = val;
+        }).catch(() => {});
+    }
+
+    // 2. Fetch Active Profile
+    fetch('profile.txt', { cache: 'no-store' }).then(r => r.text()).then(t => {
+        const val = t.trim();
+        document.getElementById('profile').textContent = val || 'unknown';
+    }).catch(() => {});
+
+    // 3. Fetch Browser Direct Location (ipwho.is with fallback to ipapi)
+    try {
+        const bResp = await fetch('https://ipwho.is/');
+        const bData = await bResp.json();
+        if (bData.success !== false && bData.ip) {
+            document.getElementById('ip-browser').textContent = bData.ip;
+            document.getElementById('b-country').textContent = bData.country || 'Unknown';
+            document.getElementById('b-city').textContent = [bData.city, bData.region].filter(Boolean).join(', ') || '—';
+            document.getElementById('b-org').textContent = bData.connection?.isp || bData.connection?.org || '—';
+        }
+    } catch (e) {
+        // Fallback to ipify if ipwho.is is blocked by adblockers
+        fetch('https://api.ipify.org')
+            .then(r => r.text())
+            .then(t => { 
+                document.getElementById('ip-browser').textContent = t.trim(); 
+                document.getElementById('b-country').textContent = 'Direct Client';
+            })
+            .catch(() => {
+                document.getElementById('ip-browser').textContent = '(browser could not fetch)';
+            });
+    }
+}
+
+refresh();
+setInterval(refresh, 10000);
+</script>
+</body>
+</html>

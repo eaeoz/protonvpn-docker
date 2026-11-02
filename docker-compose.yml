@@ -1,0 +1,70 @@
+name: protonvpn-docker
+
+services:
+  # ------------------------------------------------------------------
+  # The OpenVPN tunnel. Every other container traffic shares this netns.
+  # ------------------------------------------------------------------
+  vpn:
+    build: ./vpn
+    image: protonvpn-openvpn:latest
+    container_name: protonvpn
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - ./config:/site/config    # login.conf  (openvpn credentials, shared by ALL profiles)
+      - ./ovpn:/site/ovpn        # all of your .ovpn profiles
+      - ./state:/site/state      # which profile is the "default connection" (set from the panel)
+    environment:
+      DEFAULT_OVPN: ${DEFAULT_OVPN:-}
+    dns:
+      - 8.8.8.8                  # used only until the tunnel comes up,
+      - 1.1.1.1                  # then entrypoint switches to 10.8.0.1 (Proton tunnel DNS)
+    ports:
+      # ports must be published on the vpn service because the web container
+      # attaches to the vpn network namespace
+      - "8080:80"
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /run/tunnel-up"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    restart: unless-stopped
+
+  # ------------------------------------------------------------------
+  # Proof container: nginx has NO own network. It shares the openvpn one
+  # (network_mode: "service:vpn"), so its outbound IP = the VPN exit IP.
+  # ------------------------------------------------------------------
+  web:
+    image: nginx:alpine
+    depends_on:
+      - vpn
+    network_mode: "service:vpn"
+    volumes:
+      - ./www:/usr/share/nginx/html
+      - ./www/ipupdate.sh:/etc/ipupdate.sh:ro
+      - ./state:/site/state
+    command: sh /etc/ipupdate.sh
+    restart: unless-stopped
+
+  # ------------------------------------------------------------------
+  # Control panel: profile picker + tunnel status
+  # ------------------------------------------------------------------
+  panel:
+    build: ./panel
+    container_name: protonvpn-panel
+    depends_on:
+      - vpn
+    environment:
+      DEFAULT_OVPN: ${DEFAULT_OVPN:-}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ovpn:/app/ovpn
+      - ./state:/app/state
+      - ./www:/app/www:ro
+      - ./config:/app/config                      # credentials (login.conf) editable from the UI
+      - /var/run/docker.sock:/var/run/docker.sock   # so the panel can restart the vpn container
+    restart: unless-stopped

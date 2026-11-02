@@ -1,0 +1,3 @@
+# keep this folder in the repo; the panel writes state here:
+# selected.ovpn    - profile chosen as the default connection
+# current-profile  - profile the tunnel is currently using

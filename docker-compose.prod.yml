@@ -1,0 +1,66 @@
+name: protonvpn-docker
+
+services:
+  # ------------------------------------------------------------------
+  # The OpenVPN tunnel gateway
+  # ------------------------------------------------------------------
+  vpn:
+    image: eaeoz/protonvpn-docker:latest
+    container_name: protonvpn
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - ./config:/site/config
+      - ./ovpn:/site/ovpn
+      - ./state:/site/state
+    environment:
+      DEFAULT_OVPN: ${DEFAULT_OVPN:-}
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    ports:
+      - "8080:80"   # Proof page (web service attaches to vpn netns)
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /run/tunnel-up"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    restart: unless-stopped
+
+  # ------------------------------------------------------------------
+  # Control panel: web UI (profile picker + tunnel status + reconnect)
+  # ------------------------------------------------------------------
+  panel:
+    image: eaeoz/protonvpn-docker-panel:latest
+    container_name: protonvpn-panel
+    depends_on:
+      - vpn
+    environment:
+      DEFAULT_OVPN: ${DEFAULT_OVPN:-}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ovpn:/app/ovpn
+      - ./state:/app/state
+      - ./www:/app/www:ro
+      - ./config:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+  # ------------------------------------------------------------------
+  # Proof container: shares VPN network to verify exit IP
+  # ------------------------------------------------------------------
+  web:
+    image: nginx:alpine
+    depends_on:
+      - vpn
+    network_mode: "service:vpn"
+    volumes:
+      - ./www:/usr/share/nginx/html
+      - ./www/ipupdate.sh:/etc/ipupdate.sh:ro
+      - ./state:/site/state
+    command: sh /etc/ipupdate.sh
+    restart: unless-stopped

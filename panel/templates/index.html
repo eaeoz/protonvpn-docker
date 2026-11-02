@@ -1,0 +1,859 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ProtonVPN Control Panel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --bg-body: #0d1117;
+        --bg-card: #161b22;
+        --bg-card-header: #1c2128;
+        --bg-subtle: #21262d;
+        --bg-hover: #30363d;
+        --border-color: #30363d;
+        --border-muted: #21262d;
+        --text-primary: #f0f6fc;
+        --text-secondary: #8b949e;
+        --text-muted: #6e7681;
+        --accent-purple: #6d4aff;
+        --accent-purple-hover: #7c5cff;
+        --accent-purple-glow: rgba(109, 74, 255, 0.25);
+        --accent-blue: #58a6ff;
+        --color-success: #238636;
+        --color-success-bg: rgba(35, 134, 54, 0.15);
+        --color-success-border: #2ea043;
+        --color-danger: #da3633;
+        --color-danger-bg: rgba(218, 54, 51, 0.15);
+        --color-danger-border: #f85149;
+        --color-warning: #d29922;
+        --color-warning-bg: rgba(210, 153, 34, 0.15);
+        --color-warning-border: #bb8009;
+        --radius-sm: 6px;
+        --radius-md: 10px;
+        --radius-lg: 14px;
+        --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.35);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+        font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+        background-color: var(--bg-body);
+        color: var(--text-primary);
+        max-width: 900px;
+        margin: 2.5rem auto;
+        padding: 0 1.25rem;
+        line-height: 1.5;
+        letter-spacing: -0.01em;
+    }
+
+    /* Header */
+    header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1.2rem;
+        border-bottom: 1px solid var(--border-color);
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    .brand-title {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-size: 1.45rem;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+    .brand-badge {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        padding: 0.2rem 0.55rem;
+        border-radius: var(--radius-sm);
+        background: linear-gradient(135deg, #6d4aff, #8f65ff);
+        color: #fff;
+        letter-spacing: 0.05em;
+    }
+    .header-links a {
+        color: var(--accent-blue);
+        text-decoration: none;
+        font-size: 0.88rem;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.4rem 0.8rem;
+        border-radius: var(--radius-sm);
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        transition: all 0.2s;
+    }
+    .header-links a:hover {
+        background: var(--bg-subtle);
+        border-color: var(--accent-blue);
+    }
+
+    /* Cards */
+    .card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 1.4rem 1.6rem;
+        margin-bottom: 1.5rem;
+        box-shadow: var(--shadow-card);
+        transition: border-color 0.2s;
+    }
+    .card:focus-within {
+        border-color: #484f58;
+    }
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.2rem;
+        padding-bottom: 0.7rem;
+        border-bottom: 1px solid var(--border-muted);
+    }
+    .card-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .card-subtitle {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        font-weight: 400;
+    }
+
+    /* Status Grid */
+    .status-dashboard {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.2rem;
+    }
+    .status-tile {
+        background: var(--bg-subtle);
+        border: 1px solid var(--border-muted);
+        border-radius: var(--radius-md);
+        padding: 1rem 1.1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+    }
+    .status-tile-label {
+        font-size: 0.8rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-secondary);
+    }
+    .status-tile-value {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 1rem;
+        font-weight: 600;
+    }
+
+    /* Status Pills */
+    .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        border-radius: 999px;
+        padding: 0.2rem 0.65rem;
+        font-size: 0.82rem;
+        font-weight: 600;
+        font-family: 'JetBrains Mono', monospace;
+    }
+    .pill-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .pill.ok {
+        background: var(--color-success-bg);
+        color: #3fb950;
+        border: 1px solid var(--color-success-border);
+    }
+    .pill.ok .pill-dot { background: #3fb950; box-shadow: 0 0 6px #3fb950; }
+    .pill.down {
+        background: var(--color-danger-bg);
+        color: #f85149;
+        border: 1px solid var(--color-danger-border);
+    }
+    .pill.down .pill-dot { background: #f85149; }
+    .pill.warn {
+        background: var(--color-warning-bg);
+        color: #e3b341;
+        border: 1px solid var(--color-warning-border);
+    }
+    .pill.warn .pill-dot { background: #e3b341; }
+    .pill.default {
+        background: rgba(109, 74, 255, 0.2);
+        color: #a371f7;
+        border: 1px solid #8957e5;
+    }
+
+    /* Buttons */
+    button {
+        cursor: pointer;
+        font-family: inherit;
+        border: 1px solid var(--border-color);
+        background: var(--bg-subtle);
+        border-radius: var(--radius-sm);
+        padding: 0.5rem 1rem;
+        font-size: 0.88rem;
+        font-weight: 500;
+        color: var(--text-primary);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.45rem;
+        transition: all 0.15s ease-in-out;
+    }
+    button:hover:not(:disabled) {
+        background: var(--bg-hover);
+        border-color: #8b949e;
+        color: #fff;
+    }
+    button:active:not(:disabled) {
+        transform: translateY(1px);
+    }
+    button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+    }
+
+    .btn-primary {
+        background: var(--accent-purple);
+        border-color: var(--accent-purple);
+        color: #fff;
+        font-weight: 600;
+        box-shadow: 0 2px 8px var(--accent-purple-glow);
+    }
+    .btn-primary:hover:not(:disabled) {
+        background: var(--accent-purple-hover);
+        border-color: var(--accent-purple-hover);
+    }
+    .btn-danger {
+        background: var(--color-danger-bg);
+        color: #f85149;
+        border-color: rgba(248, 81, 73, 0.4);
+    }
+    .btn-danger:hover:not(:disabled) {
+        background: var(--color-danger);
+        color: #fff;
+        border-color: var(--color-danger);
+    }
+    .btn-restart {
+        background: rgba(210, 153, 34, 0.15);
+        color: #e3b341;
+        border-color: rgba(210, 153, 34, 0.4);
+    }
+    .btn-restart:hover:not(:disabled) {
+        background: var(--color-warning);
+        color: #0d1117;
+        border-color: var(--color-warning);
+    }
+    .btn-sm {
+        padding: 0.3rem 0.65rem;
+        font-size: 0.8rem;
+    }
+
+    /* Actions toolbar */
+    .action-bar {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    /* Forms & Inputs */
+    .form-group {
+        margin-bottom: 1rem;
+    }
+    label {
+        display: block;
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--text-secondary);
+        margin-bottom: 0.4rem;
+    }
+    input[type="text"], input[type="password"] {
+        width: 100%;
+        max-width: 360px;
+        padding: 0.55rem 0.8rem;
+        background: var(--bg-subtle);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        color: var(--text-primary);
+        font-size: 0.9rem;
+        font-family: inherit;
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input[type="text"]:focus, input[type="password"]:focus {
+        border-color: var(--accent-purple);
+        box-shadow: 0 0 0 3px var(--accent-purple-glow);
+    }
+    .form-row {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    /* Table */
+    .table-container {
+        border: 1px solid var(--border-muted);
+        border-radius: var(--radius-md);
+        overflow: hidden;
+        margin-bottom: 1rem;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--bg-card);
+    }
+    th {
+        background: var(--bg-subtle);
+        padding: 0.75rem 1rem;
+        text-align: left;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-secondary);
+        border-bottom: 1px solid var(--border-color);
+    }
+    td {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid var(--border-muted);
+        font-size: 0.9rem;
+        color: var(--text-primary);
+        vertical-align: middle;
+    }
+    tr:last-child td {
+        border-bottom: none;
+    }
+    tr:hover td {
+        background: rgba(255, 255, 255, 0.02);
+    }
+    .profile-name {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.85rem;
+    }
+
+    /* Checkbox */
+    input[type="checkbox"] {
+        accent-color: var(--accent-purple);
+        width: 15px;
+        height: 15px;
+        cursor: pointer;
+    }
+
+    /* Drag & Drop */
+    #dropzone {
+        border: 2px dashed #38414e;
+        background: rgba(22, 27, 34, 0.5);
+        border-radius: var(--radius-md);
+        padding: 1.8rem 1.5rem;
+        margin-top: 1rem;
+        text-align: center;
+        color: var(--text-secondary);
+        transition: all 0.2s;
+        cursor: pointer;
+    }
+    #dropzone:hover, #dropzone.dragging {
+        border-color: var(--accent-purple);
+        background: rgba(109, 74, 255, 0.06);
+        color: var(--text-primary);
+    }
+    .dropzone-icon {
+        font-size: 1.8rem;
+        margin-bottom: 0.5rem;
+        color: var(--accent-purple);
+    }
+
+    /* Flash alerts */
+    .flash {
+        padding: 0.75rem 1rem;
+        border-radius: var(--radius-sm);
+        margin-bottom: 1.25rem;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .flash.ok {
+        background: var(--color-success-bg);
+        border: 1px solid var(--color-success-border);
+        color: #3fb950;
+    }
+    .flash.error {
+        background: var(--color-danger-bg);
+        border: 1px solid var(--color-danger-border);
+        color: #f85149;
+    }
+
+    .muted {
+        color: var(--text-muted);
+        font-size: 0.84rem;
+    }
+    .code-tag {
+        background: var(--bg-subtle);
+        border: 1px solid var(--border-color);
+        padding: 0.15rem 0.4rem;
+        border-radius: 4px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.82rem;
+        color: #e6edf3;
+    }
+
+    /* Responsive */
+    @media (max-width: 650px) {
+        body { margin: 1.2rem auto; padding: 0 0.8rem; }
+        .form-row { flex-direction: column; }
+        input[type="text"], input[type="password"] { max-width: 100%; }
+        td, th { padding: 0.6rem 0.5rem; }
+    }
+</style>
+</head>
+<body>
+
+<header>
+    <div class="brand-title">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6d4aff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+        ProtonVPN Tunnel
+        <span class="brand-badge">Control Panel</span>
+    </div>
+    <div class="header-links">
+        <a href="http://localhost:8080" target="_blank" title="Open proof page running inside OpenVPN network">
+            <span>Proof Page (Exit IP)</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+        </a>
+    </div>
+</header>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+    <div class="flash {{ cat }}">
+        {% if cat == 'ok' %}
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        {% else %}
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        {% endif %}
+        <span>{{ msg }}</span>
+    </div>
+  {% endfor %}
+{% endwith %}
+
+<!-- Error / Warning Banner -->
+<div id="errorBanner" class="flash error" style="display: {{ 'flex' if tunnel_error else 'none' }}; flex-direction: column; align-items: flex-start; gap: 0.35rem; padding: 1rem 1.2rem; margin-bottom: 1.5rem;">
+    <div style="display: flex; align-items: center; gap: 0.6rem; font-weight: 600;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        <span id="errorTitle">VPN Connection Issue Detected</span>
+    </div>
+    <div id="errorMessage" style="font-size: 0.92rem; color: #ffb4b0; margin-left: 1.85rem;">
+        {{ tunnel_error or 'Authentication failed. Please verify your OpenVPN username and password.' }}
+    </div>
+    <div id="errorNotice" class="muted" style="color: #e0a800; font-size: 0.82rem; margin-left: 1.85rem; margin-top: 0.2rem;">
+        ⚠️ Note: The IP and location displayed below are from your <b>previous active connection</b> or cached state. Traffic is currently halted or reconnecting.
+    </div>
+</div>
+
+<!-- Status Section -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>
+            System Status
+        </h2>
+        <span class="muted" id="st-hint">Auto-refreshes every 5s</span>
+    </div>
+
+    <div class="status-dashboard">
+        <div class="status-tile">
+            <span class="status-tile-label">VPN Container</span>
+            <div class="status-tile-value">
+                <span id="st-container" class="pill {{ 'ok' if container_state == 'running' else 'down' }}">
+                    <span class="pill-dot"></span>
+                    <span class="text">{{ container_state }}</span>
+                </span>
+            </div>
+        </div>
+
+        <div class="status-tile">
+            <span class="status-tile-label">Tunnel Link</span>
+            <div class="status-tile-value">
+                <span id="st-tunnel" class="pill {{ 'ok' if tunnel == 'up' else 'warn' }}">
+                    <span class="pill-dot"></span>
+                    <span class="text">{{ tunnel }}</span>
+                </span>
+            </div>
+        </div>
+
+        <div class="status-tile">
+            <span class="status-tile-label">Active Profile</span>
+            <div class="status-tile-value" style="font-size:0.85rem; font-family:'JetBrains Mono',monospace;">
+                <span id="st-profile">{{ selected or 'None selected' }}</span>
+            </div>
+        </div>
+
+        <div class="status-tile">
+            <span class="status-tile-label">VPN Exit IP &amp; Location</span>
+            <div class="status-tile-value" style="font-size:0.88rem; flex-direction:column; align-items:flex-start; gap:0.2rem;">
+                <span id="st-ip" style="font-family:'JetBrains Mono',monospace; color:var(--accent-blue);">Detecting…</span>
+                <span id="st-geo" class="muted" style="font-size:0.78rem;">—</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="action-bar">
+        <button type="button" id="refreshBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            Refresh
+        </button>
+        <button type="button" id="restartBtn" class="btn-restart">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+            Restart Tunnel
+        </button>
+    </div>
+</div>
+
+<!-- Credentials Section -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>
+            OpenVPN Credentials
+        </h2>
+        <span class="card-subtitle"><code class="code-tag">config/login.conf</code></span>
+    </div>
+
+    {% if cred_saved %}
+    <p class="muted" style="margin-bottom: 1rem;">
+        Credentials are stored securely. Passwords are never echoed. Leave password empty to keep existing.
+    </p>
+    {% else %}
+    <p class="muted" style="margin-bottom: 1rem;">
+        No credentials file detected. Enter your <b>OpenVPN username and password</b> (from ProtonVPN Dashboard &rarr; Account &rarr; OpenVPN / IKEv2, <b>not</b> your email).
+    </p>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('credentials') }}" id="credForm">
+        <div class="form-row">
+            <div class="form-group" style="flex: 1;">
+                <label for="credUser">OpenVPN Username</label>
+                <input type="text" id="credUser" name="username" autocomplete="off" spellcheck="false" placeholder="e.g. username+p2p" required>
+            </div>
+            <div class="form-group" style="flex: 1;">
+                <label for="credPass">OpenVPN Password</label>
+                <input type="password" id="credPass" name="password" placeholder="{{ 'Leave empty to keep existing' if cred_saved else 'OpenVPN password' }}" autocomplete="new-password">
+            </div>
+        </div>
+        <button type="submit" id="credSave" class="btn-primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+            Save Credentials &amp; Reconnect
+        </button>
+    </form>
+</div>
+
+<!-- Profiles Section -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+            Tunnel Profiles
+        </h2>
+        <span class="card-subtitle"><code class="code-tag">./ovpn/*.ovpn</code></span>
+    </div>
+
+    {% if profiles %}
+    <form method="post" action="{{ url_for('delete') }}" id="profilesForm">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 40px; text-align: center;"><input type="checkbox" id="checkAll" title="Select all profiles"></th>
+                        <th>Profile Name</th>
+                        <th>Status</th>
+                        <th style="text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in profiles %}
+                    <tr>
+                        <td style="text-align: center;">
+                            {% if p != selected %}
+                            <input type="checkbox" name="name" class="rowcheck" value="{{ p }}">
+                            {% else %}
+                            <span class="muted" title="Active connection protected">&mdash;</span>
+                            {% endif %}
+                        </td>
+                        <td><span class="profile-name">{{ p }}</span></td>
+                        <td>
+                            {% if p == selected %}
+                            <span class="pill default">Active Default</span>
+                            {% else %}
+                            <span class="muted">&mdash;</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right;">
+                            {% if p != selected %}
+                            <button type="button" class="btn-sm rowuse" data-name="{{ p }}">Use as default</button>
+                            <button type="button" class="btn-sm btn-danger rowdel" data-name="{{ p }}">Delete</button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="action-bar" style="margin-bottom: 1.5rem;">
+            <button type="submit" id="deleteSelected" class="btn-danger">Delete Selected</button>
+            <span class="muted" id="delInfo">Active connection cannot be deleted.</span>
+        </div>
+    </form>
+    {% else %}
+    <p class="muted" style="margin-bottom: 1rem;">No <code class="code-tag">.ovpn</code> profiles found. Drop your ProtonVPN configs into the <code>ovpn/</code> folder or upload below.</p>
+    {% endif %}
+
+    <!-- Upload area -->
+    <div id="dropzone">
+        <div class="dropzone-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+        </div>
+        <p style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.2rem;">Drag &amp; drop .ovpn file(s) here</p>
+        <span class="muted">or click to browse files from your computer</span>
+        <div id="droplist" style="margin-top: 0.6rem; font-weight: 500; color: var(--accent-blue);"></div>
+    </div>
+
+    <form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data" id="uploadForm" style="display: flex; gap: 0.8rem; align-items: center; margin-top: 1rem; flex-wrap: wrap;">
+        <input type="file" name="profile" id="fileInput" accept=".ovpn" multiple style="display: none;">
+        <button type="button" id="browseBtn">Select File(s)</button>
+        <button type="submit" id="uploadBtn" class="btn-primary" disabled>Upload Profile(s)</button>
+    </form>
+</div>
+
+<script>
+/* ---------------- file picking: browser button + drag & drop ---------------- */
+const fileInput = document.getElementById('fileInput');
+const browseBtn = document.getElementById('browseBtn');
+const dropzone  = document.getElementById('dropzone');
+const droplist  = document.getElementById('droplist');
+const uploadBtn = document.getElementById('uploadBtn');
+
+browseBtn.addEventListener('click', () => fileInput.click());
+dropzone.addEventListener('click', () => fileInput.click());
+
+function describeFiles() {
+    const files = [...fileInput.files];
+    if (files.length > 0) {
+        droplist.textContent = `${files.length} file(s) chosen: ${files.map(f => f.name).join(', ')}`;
+        uploadBtn.disabled = false;
+    } else {
+        droplist.textContent = '';
+        uploadBtn.disabled = true;
+    }
+}
+
+fileInput.addEventListener('change', describeFiles);
+
+['dragenter', 'dragover'].forEach(ev =>
+    dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add('dragging'); }));
+['dragleave', 'drop'].forEach(ev =>
+    dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove('dragging'); }));
+
+dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    const dt = new DataTransfer();
+    const seen = new Set([...fileInput.files].map(f => f.name));
+    [...fileInput.files].forEach(f => dt.items.add(f));
+    [...(e.dataTransfer.files || [])].forEach(f => {
+        if (f.name.toLowerCase().endsWith('.ovpn') && !seen.has(f.name)) {
+            dt.items.add(f);
+            seen.add(f.name);
+        }
+    });
+    fileInput.files = dt.files;
+    describeFiles();
+});
+
+/* ---------------- upload handler ---------------- */
+document.getElementById('uploadForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!fileInput.files.length) return;
+    uploadBtn.disabled = true;
+    uploadBtn.textContent = 'Uploading…';
+    try {
+        const fd = new FormData();
+        [...fileInput.files].forEach(f => fd.append('profile', f));
+        const resp = await fetch(e.target.action, { method: 'POST', body: fd, redirect: 'follow' });
+        if (!resp.ok && resp.status !== 400) throw new Error('Upload error: HTTP ' + resp.status);
+    } catch (err) {
+        alert('Upload failed: ' + err.message);
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = 'Upload Profile(s)';
+        return;
+    }
+    window.location.href = location.pathname;
+});
+
+/* ---------------- profiles table handlers ---------------- */
+const checkAll = document.getElementById('checkAll');
+const deleteBtn = document.getElementById('deleteSelected');
+const profilesForm = document.getElementById('profilesForm');
+
+function updateDeleteInfo() {
+    const checks = [...document.querySelectorAll('.rowcheck')];
+    const n = checks.filter(c => c.checked).length;
+    if (deleteBtn) {
+        deleteBtn.textContent = n ? `Delete Selected (${n})` : 'Delete Selected';
+    }
+    if (checkAll) {
+        checkAll.indeterminate = n > 0 && n < checks.length;
+        checkAll.checked = checks.length > 0 && n === checks.length;
+    }
+}
+
+if (checkAll) {
+    checkAll.addEventListener('change', () => {
+        document.querySelectorAll('.rowcheck').forEach(c => c.checked = checkAll.checked);
+        updateDeleteInfo();
+    });
+    document.querySelectorAll('.rowcheck').forEach(c => c.addEventListener('change', updateDeleteInfo));
+    updateDeleteInfo();
+}
+
+// Single delete from row
+document.querySelectorAll('.rowdel').forEach(btn => btn.addEventListener('click', () => {
+    if (!confirm(`Delete profile "${btn.dataset.name}"?`)) return;
+    document.querySelectorAll('.rowcheck').forEach(c => c.checked = false);
+    const row = btn.closest('tr');
+    row.querySelector('.rowcheck').checked = true;
+    profilesForm.submit();
+}));
+
+// Use as default
+document.querySelectorAll('.rowuse').forEach(btn => btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.textContent = 'Switching…';
+    const fd = new FormData();
+    fd.append('name', btn.dataset.name);
+    try {
+        await fetch('/select', { method: 'POST', body: fd, redirect: 'follow' });
+    } catch (err) { alert('Failed: ' + err.message); }
+    window.location.href = location.pathname;
+}));
+
+if (profilesForm) {
+    profilesForm.addEventListener('submit', e => {
+        const n = [...document.querySelectorAll('.rowcheck:checked')].length;
+        if (n === 0) { e.preventDefault(); return; }
+        if (n > 1 && !confirm(`Are you sure you want to delete ${n} profiles?`)) { e.preventDefault(); return; }
+    });
+}
+
+/* ---------------- live status refresh ---------------- */
+async function refreshStatus() {
+    try {
+        const s = await (await fetch('/status')).json();
+        const c = document.getElementById('st-container');
+        const t = document.getElementById('st-tunnel');
+        const p = document.getElementById('st-profile');
+        
+        c.querySelector('.text').textContent = s.container_state;
+        c.className = 'pill ' + (s.container_state === 'running' ? 'ok' : 'down');
+        
+        t.querySelector('.text').textContent = s.tunnel;
+        t.className = 'pill ' + (s.tunnel === 'up' ? 'ok' : 'warn');
+
+        if (p && s.selected) {
+            p.textContent = s.selected;
+        }
+
+        const ipEl = document.getElementById('st-ip');
+        const geoEl = document.getElementById('st-geo');
+        let info = s.ipinfo;
+
+        // If backend ipinfo is not yet loaded, try fetching directly from proof server (localhost:8080)
+        if (!info || !info.ip || info.ip === 'loading...' || info.ip === 'error') {
+            try {
+                const proofResp = await fetch('http://' + window.location.hostname + ':8080/ipinfo.json', { cache: 'no-store' });
+                if (proofResp.ok) info = await proofResp.json();
+            } catch (_) {}
+        }
+
+        const errBanner = document.getElementById('errorBanner');
+        const errMsg = document.getElementById('errorMessage');
+        if (s.error) {
+            errBanner.style.display = 'flex';
+            errMsg.textContent = s.error;
+        } else if (s.tunnel === 'up') {
+            errBanner.style.display = 'none';
+        }
+
+        if (info && info.ip && info.ip !== 'loading...' && info.ip !== 'error') {
+            ipEl.textContent = info.ip;
+            const country = info.country_name || info.country || '';
+            const city = info.city || '';
+            const org = info.org || info.connection?.isp || '';
+            const parts = [city, country].filter(Boolean);
+            let locStr = parts.join(', ');
+            if (org) locStr += (locStr ? ' (' + org + ')' : org);
+            if (s.tunnel !== 'up') {
+                locStr += ' [Cached from previous session]';
+            }
+            geoEl.textContent = locStr || 'Location detected';
+        } else if (s.tunnel !== 'up') {
+            ipEl.textContent = 'Tunnel down';
+            geoEl.textContent = 'No active connection';
+        }
+    } catch (err) { /* ignore transient network hiccups */ }
+}
+
+setInterval(refreshStatus, 5000);
+document.getElementById('refreshBtn').addEventListener('click', refreshStatus);
+
+/* ---------------- restart tunnel button ---------------- */
+document.getElementById('restartBtn').addEventListener('click', async e => {
+    if (!confirm('Reconnect the VPN tunnel now? (Traffic will briefly reconnect in ~10s)')) return;
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    const origHTML = btn.innerHTML;
+    btn.textContent = 'Restarting…';
+    try {
+        await fetch('/restart', { method: 'POST', redirect: 'follow' });
+        await new Promise(r => setTimeout(r, 2000));
+        refreshStatus();
+    } catch (err) {
+        alert('Restart failed: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = origHTML;
+    }
+});
+</script>
+
+</body>
+</html>
