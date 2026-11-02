@@ -225,6 +225,20 @@
         </p>
     </div>
 
+    <!-- Info Banner when no OpenVPN profile exists -->
+    <div id="noProfileBanner" style="display: none; background: rgba(109, 74, 255, 0.08); border: 1px solid var(--accent-purple); border-radius: var(--radius-md); padding: 1rem 1.25rem; margin-bottom: 1.5rem;">
+        <div style="font-weight: 700; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; color: #a371f7;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            No OpenVPN Profile Loaded
+        </div>
+        <p style="font-size: 0.92rem; color: var(--text-primary);">
+            The <code class="code-tag">ovpn/</code> folder is currently empty, so there is no tunnel and no exit IP data to show yet.
+        </p>
+        <p style="font-size: 0.85rem; color: var(--text-secondary);">
+            Open the <a href="http://localhost:8000" style="color: var(--accent-blue);">Control Panel</a> to upload a <code class="code-tag">.ovpn</code> profile and save your OpenVPN credentials. IP and location proof data will appear here once the tunnel is connected.
+        </p>
+    </div>
+
     <!-- VPN Container Section -->
     <div class="card">
         <div class="card-header">
@@ -301,7 +315,8 @@
 
 <script>
 async function refresh() {
-    // 0. Check panel status for tunnel state & errors if accessible
+    // 0. Check panel status for tunnel state, profiles & errors if accessible
+    let profiles = null;
     try {
         const sResp = await fetch('http://' + window.location.hostname + ':8000/status', { cache: 'no-store' });
         if (sResp.ok) {
@@ -314,34 +329,72 @@ async function refresh() {
             } else {
                 wBox.style.display = 'none';
             }
+            if (Array.isArray(s.profiles)) profiles = s.profiles;
         }
     } catch (_) {}
+
+    const banner = document.getElementById('noProfileBanner');
+    const profileEl = document.getElementById('profile');
+    const ipEl = document.getElementById('ip-tunnel');
+    const tCountry = document.getElementById('t-country');
+    const tCity = document.getElementById('t-city');
+    const tOrg = document.getElementById('t-org');
+
+    // No profile anywhere (ovpn folder empty): show an info message instead of
+    // a profile name and NEVER display IP/geo data from a previous session.
+    if (profiles !== null && profiles.length === 0) {
+        banner.style.display = 'block';
+        profileEl.textContent = 'No profile loaded';
+        ipEl.textContent = '\u2014';
+        ipEl.className = 'ip';
+        tCountry.textContent = '\u2014';
+        tCity.textContent = '\u2014';
+        tOrg.textContent = '\u2014';
+        return;
+    }
 
     // 1. Fetch VPN Tunnel IP & Location from ipinfo.json generated inside container
     try {
         const resp = await fetch('ipinfo.json', { cache: 'no-store' });
         if (resp.ok) {
             const data = await resp.json();
-            if (data.ip && data.ip !== 'loading...' && data.ip !== 'error') {
+            const badIp = !data.ip || data.ip === 'loading...' || data.ip === 'error' || data.ip === 'no-profile' || data.ip === 'stopped';
+            if (!badIp) {
                 document.getElementById('ip-tunnel').textContent = data.ip;
                 document.getElementById('t-country').textContent = data.country_name || data.country || 'Unknown';
                 document.getElementById('t-city').textContent = [data.city, data.region].filter(Boolean).join(', ') || '—';
                 document.getElementById('t-org').textContent = data.org || data.connection?.isp || data.asn || '—';
+            } else if (data.ip === 'no-profile') {
+                document.getElementById('ip-tunnel').textContent = '\u2014';
+                document.getElementById('t-country').textContent = '\u2014';
+                document.getElementById('t-city').textContent = '\u2014';
+                document.getElementById('t-org').textContent = '\u2014';
+            } else {
+                // No tunnel data (stopped / connecting / fetch error) - never
+                // leave values of the previous connection on the page.
+                document.getElementById('ip-tunnel').textContent =
+                    data.ip === 'stopped' ? 'stopped' :
+                    data.ip === 'loading...' ? 'detecting…' :
+                    data.ip === 'error' ? 'error' : '\u2014';
+                document.getElementById('t-country').textContent =
+                    data.ip === 'stopped' ? 'Tunnel stopped (panel)' : 'Detecting…';
+                document.getElementById('t-city').textContent = '\u2014';
+                document.getElementById('t-org').textContent = '\u2014';
             }
         }
     } catch (_) {
         // Fallback to ip.txt if ipinfo.json not ready yet
         fetch('ip.txt', { cache: 'no-store' }).then(r => r.text()).then(t => {
             const val = t.trim();
-            if (val) document.getElementById('ip-tunnel').textContent = val;
+            if (val && val !== 'no-profile') document.getElementById('ip-tunnel').textContent = val;
         }).catch(() => {});
     }
 
     // 2. Fetch Active Profile
     fetch('profile.txt', { cache: 'no-store' }).then(r => r.text()).then(t => {
         const val = t.trim();
-        document.getElementById('profile').textContent = val || 'unknown';
-    }).catch(() => {});
+        profileEl.textContent = (val && val !== 'unknown' && val !== 'no-profile') ? val : 'No profile loaded';
+    }).catch(() => profileEl.textContent = 'No profile loaded');
 
     // 3. Fetch Browser Direct Location (ipwho.is with fallback to ipapi)
     try {

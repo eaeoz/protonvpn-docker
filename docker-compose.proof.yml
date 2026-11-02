@@ -1,0 +1,32 @@
+name: protonvpn-proof
+
+# ------------------------------------------------------------------------
+# STANDALONE PROOF PAGE - run this from ANY folder, even a different
+# machine setup. It attaches to an ALREADY-RUNNING ProtonVPN gateway
+# container (default name: "protonvpn") and shares its network
+# namespace, so the exit IP it reports belongs to the same tunnel the
+# vpn container uses. Nothing is restarted; the tunnel is never touched.
+#
+#   docker compose -f docker-compose.proof.yml up -d
+#   -> open http://localhost:8080
+#
+# NOTE: run EITHER this OR the `web` service of the main stack - both
+# listen on port 80 inside the shared network namespace, so running
+# both at once causes a bind conflict (the second one just fails,
+# the tunnel and panel keep working).
+#
+# Optional: mount the SAME ./state folder the vpn stack uses to show
+# the live profile name (otherwise the page says the profile is unknown
+# but the exit IP still works):
+#     volumes:
+#       - /path/to/state:/site/state
+# ------------------------------------------------------------------------
+
+services:
+  proof:
+    image: eaeoz/protonvpn-docker-proof:1
+    container_name: protonvpn-proof
+    network_mode: "container:protonvpn"   # attach to the running vpn container
+    # volumes:
+    #   - ./state:/site/state             # optional: live profile name
+    restart: unless-stopped

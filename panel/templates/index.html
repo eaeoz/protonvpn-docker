@@ -555,6 +555,14 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
             Restart Tunnel
         </button>
+        <button type="button" id="stopBtn" class="btn-danger">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="2" ry="2"></rect></svg>
+            Stop Tunnel
+        </button>
+        <button type="button" id="startBtn" class="btn-primary" style="display:none;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>
+            Start Tunnel
+        </button>
     </div>
 </div>
 
@@ -797,6 +805,8 @@ if (profilesForm) {
 async function refreshStatus() {
     try {
         const s = await (await fetch('/status')).json();
+        wantedState = s.wanted || wantedState || 'auto';
+        syncTunnelButtons();
         const c = document.getElementById('st-container');
         const t = document.getElementById('st-tunnel');
         const p = document.getElementById('st-profile');
@@ -813,10 +823,25 @@ async function refreshStatus() {
 
         const ipEl = document.getElementById('st-ip');
         const geoEl = document.getElementById('st-geo');
+        const profEl = document.getElementById('st-profile');
+        if (profEl && Array.isArray(s.profiles)) {
+            profEl.textContent = s.selected || 'None selected';
+        }
+
+        // No profile anywhere (ovpn folder empty): show an info message and
+        // never display IP data cached from a previous session.
+        if (Array.isArray(s.profiles) && s.profiles.length === 0) {
+            ipEl.textContent = 'No profile';
+            ipEl.style.color = 'var(--text-muted)';
+            geoEl.textContent = 'Upload a .ovpn profile to start';
+            return;
+        }
+        ipEl.style.color = 'var(--accent-blue)';
+
         let info = s.ipinfo;
 
         // If backend ipinfo is not yet loaded, try fetching directly from proof server (localhost:8080)
-        if (!info || !info.ip || info.ip === 'loading...' || info.ip === 'error') {
+        if (!info || !info.ip || info.ip === 'loading...' || info.ip === 'error' || info.ip === 'no-profile') {
             try {
                 const proofResp = await fetch('http://' + window.location.hostname + ':8080/ipinfo.json', { cache: 'no-store' });
                 if (proofResp.ok) info = await proofResp.json();
@@ -832,7 +857,7 @@ async function refreshStatus() {
             errBanner.style.display = 'none';
         }
 
-        if (info && info.ip && info.ip !== 'loading...' && info.ip !== 'error') {
+        if (info && info.ip && info.ip !== 'loading...' && info.ip !== 'error' && info.ip !== 'no-profile') {
             ipEl.textContent = info.ip;
             const country = info.country_name || info.country || '';
             const city = info.city || '';
@@ -854,24 +879,48 @@ async function refreshStatus() {
 setInterval(refreshStatus, 5000);
 document.getElementById('refreshBtn').addEventListener('click', refreshStatus);
 
-/* ---------------- restart tunnel button ---------------- */
-document.getElementById('restartBtn').addEventListener('click', async e => {
-    if (!confirm('Reconnect the VPN tunnel now? (Traffic will briefly reconnect in ~10s)')) return;
-    const btn = e.currentTarget;
-    btn.disabled = true;
-    const origHTML = btn.innerHTML;
-    btn.textContent = 'Restarting…';
-    try {
-        await fetch('/restart', { method: 'POST', redirect: 'follow' });
-        await new Promise(r => setTimeout(r, 2000));
-        refreshStatus();
-    } catch (err) {
-        alert('Restart failed: ' + err.message);
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = origHTML;
-    }
-});
+/* ---------------- tunnel control: stop / start / restart ---------------- */
+let wantedState = '';
+
+function syncTunnelButtons() {
+    const stopB = document.getElementById('stopBtn');
+    const startB = document.getElementById('startBtn');
+    if (!stopB || !startB) return;
+    const stopped = (wantedState === 'stopped');
+    stopB.style.display = stopped ? 'none' : '';
+    startB.style.display = stopped ? '' : 'none';
+}
+
+function makeCtl(btnId, url, confirmMsg) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    const onClick = async e => {
+        if (confirmMsg && !confirm(confirmMsg)) return;
+        const origHTML = btn.innerHTML;
+        btn.disabled = true;
+        btn.textContent = 'Working…';
+        try {
+            await fetch(url, { method: 'POST', redirect: 'follow' });
+            await new Promise(r => setTimeout(r, 1500));
+            refreshStatus();
+        } catch (err) {
+            alert('Request failed: ' + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = origHTML;
+            syncTunnelButtons();
+        }
+    };
+    btn.addEventListener('click', onClick);
+}
+
+makeCtl('restartBtn', '/restart',
+    'Reconnect the VPN tunnel now? (Traffic will briefly reconnect in ~10s)');
+makeCtl('stopBtn', '/stop',
+    'Take the VPN tunnel down? (All traffic through the tunnel stops until you press Start Tunnel.)');
+makeCtl('startBtn', '/start',
+    'Bring the VPN tunnel back up?');
+
 </script>
 
 </body>

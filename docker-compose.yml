@@ -26,7 +26,7 @@ services:
       # attaches to the vpn network namespace
       - "8080:80"
     healthcheck:
-      test: ["CMD-SHELL", "test -f /run/tunnel-up"]
+      test: ["CMD-SHELL", "test -f /run/tunnel-up || test -f /site/state/tunnel-stopped"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -36,17 +36,17 @@ services:
   # ------------------------------------------------------------------
   # Proof container: nginx has NO own network. It shares the openvpn one
   # (network_mode: "service:vpn"), so its outbound IP = the VPN exit IP.
+  # The proof page + ip updater are BAKED into the image (www/Dockerfile),
+  # so this never depends on host-side files being readable.
   # ------------------------------------------------------------------
   web:
-    image: nginx:alpine
+    build: ./www
+    image: eaeoz/protonvpn-docker-proof:latest
     depends_on:
       - vpn
     network_mode: "service:vpn"
     volumes:
-      - ./www:/usr/share/nginx/html
-      - ./www/ipupdate.sh:/etc/ipupdate.sh:ro
-      - ./state:/site/state
-    command: sh /etc/ipupdate.sh
+      - ./state:/site/state      # optional: live "current profile" name
     restart: unless-stopped
 
   # ------------------------------------------------------------------

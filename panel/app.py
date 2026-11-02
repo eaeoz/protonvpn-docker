@@ -28,6 +28,9 @@ WWW_DIR = pathlib.Path("/app/www")
 CONFIG_FILE = pathlib.Path("/app/config/login.conf")
 SELECTED_FILE = STATE_DIR / "selected.ovpn"
 RELOAD_FILE = STATE_DIR / "reload-request"   # tunnel reconnects when this appears
+STOP_REQUEST_FILE = STATE_DIR / "tunnel-stop-request"
+START_REQUEST_FILE = STATE_DIR / "tunnel-start-request"
+STOPPED_FILE = STATE_DIR / "tunnel-stopped"  # persists "off" until Start is pressed
 
 # Check if ovpn/state are mounted under /site (when running embedded in vpn container)
 if not OVPN_DIR.is_dir() and pathlib.Path("/site/ovpn").is_dir():
@@ -36,6 +39,9 @@ if not OVPN_DIR.is_dir() and pathlib.Path("/site/ovpn").is_dir():
     CONFIG_FILE = pathlib.Path("/site/config/login.conf")
     SELECTED_FILE = STATE_DIR / "selected.ovpn"
     RELOAD_FILE = STATE_DIR / "reload-request"
+    STOP_REQUEST_FILE = STATE_DIR / "tunnel-stop-request"
+    START_REQUEST_FILE = STATE_DIR / "tunnel-start-request"
+    STOPPED_FILE = STATE_DIR / "tunnel-stopped"
 DEFAULT_OVPN = os.environ.get("DEFAULT_OVPN", "")
 VPN_CONTAINER = "protonvpn"
 
@@ -97,7 +103,11 @@ def vpn_status():
     try:
         c.reload()
         state = c.status  # created | running | restarting | exited ...
-        res = c.exec_run("sh -c 'test -f /run/tunnel-up && echo up || echo connecting'")
+        res = c.exec_run(
+            "sh -c 'if [ -f /run/tunnel-up ]; then echo up;"
+            " elif [ -e /site/state/tunnel-stopped ]; then echo down;"
+            " else echo connecting; fi'"
+        )
         tunnel = res.output.decode(errors="replace").strip() or "connecting"
         return state, tunnel, err
     except DockerException:
@@ -215,10 +225,33 @@ def credentials_configured():
 def restart():
     """Force a tunnel reconnect (same hot path as a profile/credentials change).
     Deliberately NOT a container restart - the network namespace is preserved,
-    so the proof page never goes down."""
+    so the proof page never goes down. If the tunnel was stopped, this
+    effectively starts it again."""
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     RELOAD_FILE.write_text("", encoding="utf-8", newline="\n")
+    STOP_REQUEST_FILE.unlink(missing_ok=True)
     flash("Tunnel restart requested - reconnecting in a few seconds…", "ok")
+    return redirect(url_for("index"))
+
+
+@app.post("/stop")
+def stop():
+    """Take the tunnel down on purpose. Vpn container tears openvpn down and
+    keeps it down (state/tunnel-stopped) until Start/Restart is pressed."""
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    START_REQUEST_FILE.unlink(missing_ok=True)
+    STOP_REQUEST_FILE.write_text("", encoding="utf-8", newline="\n")
+    flash("Tunnel stop requested - traffic will stop leaving through the VPN in a few seconds.", "ok")
+    return redirect(url_for("index"))
+
+
+@app.post("/start")
+def start():
+    """Bring the tunnel back up after a manual stop."""
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    STOP_REQUEST_FILE.unlink(missing_ok=True)
+    START_REQUEST_FILE.write_text("", encoding="utf-8", newline="\n")
+    flash("Tunnel start requested - connecting in a few seconds…", "ok")
     return redirect(url_for("index"))
 
 
@@ -252,31 +285,41 @@ def credentials():
     return redirect(url_for("index"))
 
 
+@app.get("/health")
+def health():
+    """Lightweight probe endpoint for healthchecks/updaters."""
+    return {"status": "ok"}
+
+
 @app.get("/status")
 def status():
     """JSON status for the auto-refresh in the UI (no flash session side effects)."""
     state, tunnel, err = vpn_status()
+    profiles = list_profiles()
     selected = selected_profile()
-    if selected not in list_profiles():
+    if selected not in profiles:
         selected = ""
-    
+
     # Read IP info from state/ipinfo.json or www/ipinfo.json if available
     ipinfo = {}
-    for candidate in [STATE_DIR / "ipinfo.json", WWW_DIR / "ipinfo.json"]:
-        if candidate.is_file():
-            try:
-                ipinfo = json.loads(candidate.read_text(encoding="utf-8", errors="replace"))
-                if ipinfo and ipinfo.get("ip"):
-                    break
-            except Exception:
-                pass
+    if profiles:
+        for candidate in [STATE_DIR / "ipinfo.json", WWW_DIR / "ipinfo.json"]:
+            if candidate.is_file():
+                try:
+                    ipinfo = json.loads(candidate.read_text(encoding="utf-8", errors="replace"))
+                    if ipinfo and ipinfo.get("ip"):
+                        break
+                except Exception:
+                    pass
 
     return {
         "container_state": state,
         "tunnel": tunnel,
         "selected": selected,
+        "profiles": profiles,
         "error": err,
         "ipinfo": ipinfo,
+        "wanted": "stopped" if STOPPED_FILE.is_file() else "auto",
     }
 
 

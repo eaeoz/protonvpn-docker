@@ -2,7 +2,7 @@
 
 A production-ready Dockerized ProtonVPN gateway featuring a **hot-swappable OpenVPN tunnel**, an **embedded Web Control Panel**, and an **independent verification Proof Page** with real-time external IP and geolocation telemetry.
 
-The image `eaeoz/protonvpn-docker:3` is an **All-in-One** container: it bundles both the OpenVPN tunnel and the Web UI. A single `docker run` command starts the VPN tunnel and serves the full interactive dashboard on port 8000!
+The image `eaeoz/protonvpn-docker:1` is an **All-in-One** container: it bundles both the OpenVPN tunnel and the Web UI. A single `docker run` command starts the VPN tunnel and serves the full interactive dashboard on port 8000!
 
 ---
 
@@ -16,24 +16,31 @@ mkdir -p ovpn config state
 
 ### Windows (PowerShell) - Single Line:
 ```powershell
-docker run -d --name protonvpn --cap-add=NET_ADMIN --device=/dev/net/tun -p 8000:8000 -v "${PWD}/ovpn:/site/ovpn" -v "${PWD}/config:/site/config" -v "${PWD}/state:/site/state" --dns 8.8.8.8 --dns 1.1.1.1 --restart unless-stopped eaeoz/protonvpn-docker:3
+docker run -d --name protonvpn --cap-add=NET_ADMIN --device=/dev/net/tun -p 8000:8000 -p 8080:80 -v "${PWD}/ovpn:/site/ovpn" -v "${PWD}/config:/site/config" -v "${PWD}/state:/site/state" --dns 8.8.8.8 --dns 1.1.1.1 --restart unless-stopped eaeoz/protonvpn-docker:1
+
+# Optional proof page (exit IP verification) - attaches to the running vpn, no other files needed:
+docker run -d --name protonvpn-proof --network container:protonvpn --restart unless-stopped eaeoz/protonvpn-docker-proof:1
 ```
 
 ### Windows (CMD) - Single Line:
 ```cmd
-docker run -d --name protonvpn --cap-add=NET_ADMIN --device=/dev/net/tun -p 8000:8000 -v "%cd%/ovpn:/site/ovpn" -v "%cd%/config:/site/config" -v "%cd%/state:/site/state" --dns 8.8.8.8 --dns 1.1.1.1 --restart unless-stopped eaeoz/protonvpn-docker:3
+docker run -d --name protonvpn --cap-add=NET_ADMIN --device=/dev/net/tun -p 8000:8000 -p 8080:80 -v "%cd%/ovpn:/site/ovpn" -v "%cd%/config:/site/config" -v "%cd%/state:/site/state" --dns 8.8.8.8 --dns 1.1.1.1 --restart unless-stopped eaeoz/protonvpn-docker:1
+
+docker run -d --name protonvpn-proof --network container:protonvpn --restart unless-stopped eaeoz/protonvpn-docker-proof:1
 ```
 
 ### Linux / macOS (Bash) - Single Line:
 ```bash
-docker run -d --name protonvpn --cap-add=NET_ADMIN --device=/dev/net/tun -p 8000:8000 -v "$(pwd)/ovpn:/site/ovpn" -v "$(pwd)/config:/site/config" -v "$(pwd)/state:/site/state" --dns 8.8.8.8 --dns 1.1.1.1 --restart unless-stopped eaeoz/protonvpn-docker:3
+docker run -d --name protonvpn --cap-add=NET_ADMIN --device=/dev/net/tun -p 8000:8000 -p 8080:80 -v "$(pwd)/ovpn:/site/ovpn" -v "$(pwd)/config:/site/config" -v "$(pwd)/state:/site/state" --dns 8.8.8.8 --dns 1.1.1.1 --restart unless-stopped eaeoz/protonvpn-docker:1
+
+docker run -d --name protonvpn-proof --network container:protonvpn --restart unless-stopped eaeoz/protonvpn-docker-proof:1
 ```
 
 👉 Now open **[http://localhost:8000](http://localhost:8000)** in your browser!
 - Enter your ProtonVPN OpenVPN username/password directly into the web UI.
 - Drag & drop `.ovpn` files to upload new servers.
 - Switch your active server with one click ("Use as default").
-- Click **"Restart Tunnel"** whenever needed.
+- Control the tunnel with **Restart Tunnel**, **Stop Tunnel** and **Start Tunnel** buttons.
 - Monitor your live exit IP, Country, City, and ISP.
 
 > **Routing Other Containers:** To route another container through this VPN tunnel, add `--net=container:protonvpn` to that container's `docker run` command.
@@ -49,7 +56,7 @@ name: protonvpn-docker
 
 services:
   vpn:
-    image: eaeoz/protonvpn-docker:3
+    image: eaeoz/protonvpn-docker:1
     container_name: protonvpn
     cap_add:
       - NET_ADMIN
@@ -65,17 +72,26 @@ services:
     dns:
       - 8.8.8.8
       - 1.1.1.1
+    healthcheck:
+      # healthy when the tunnel is up OR when it was deliberately stopped
+      # from the panel (state/tunnel-stopped persists until Start is pressed)
+      test: ["CMD-SHELL", "test -f /run/tunnel-up || test -f /site/state/tunnel-stopped"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
     restart: unless-stopped
 
-  # Optional: proof page that proves web traffic exits through the VPN tunnel
+  # Optional: proof page that proves web traffic exits through the VPN tunnel.
+  # Fully self-contained image (page + IP updater baked in) - no host files needed.
   proof:
-    image: nginx:alpine
+    image: eaeoz/protonvpn-docker-proof:1
     depends_on:
       vpn:
         condition: service_started
     network_mode: "service:vpn"
     volumes:
-      - ./www:/usr/share/nginx/html
+      - ./state:/site/state   # optional: live "current profile" name
     restart: unless-stopped
 ```
 
@@ -89,22 +105,70 @@ docker compose up -d
 
 ---
 
+## 🔎 Standalone Proof Page (attach to an already-running gateway)
+
+Test your exit IP from any folder, without touching the tunnel. Ships as
+[`docker-compose.proof.yml`](docker-compose.proof.yml) - it attaches to an
+**already-running** `protonvpn` container and shares its network namespace:
+
+```bash
+docker compose -f docker-compose.proof.yml up -d
+# -> open http://localhost:8080
+```
+
+Or as a single `docker run`:
+
+```bash
+docker run -d --name protonvpn-proof --network container:protonvpn --restart unless-stopped eaeoz/protonvpn-docker-proof:1
+```
+
+> **Note:** run EITHER this standalone proof container OR the `web`/`proof`
+> service of the main stack - both listen on port 80 inside the same shared
+> network namespace, so running both at once causes a bind conflict (the VPN
+> tunnel and the control panel keep working either way). If no profile is
+> loaded yet, the proof page shows a "No OpenVPN profile loaded" message and
+> hides IP data instead of stale values.
+
+---
+
 ## 🌟 Key Features
 
 - **All-in-One Architecture**: Control panel is embedded directly inside the gateway image—no separate backend containers required.
 - **Zero Profile Editing**: Single credential injection via `config/login.conf` automatically applied to all `.ovpn` profiles.
-- **Hot-Swapping Without Downtime**: Switch between VPN servers or restart the tunnel directly from the web panel. Containers sharing the VPN network (`network_mode: "service:vpn"`) maintain their network namespace.
-- **Web Control Panel (Port 8000)**:
-  - System status indicators with live animated status dots (Container state, Tunnel link, Active profile).
-  - One-click **Restart Tunnel** trigger with automatic reconnect.
+- **Hot-Swapping Without Downtime**: Switch between VPN servers or restart the tunnel directly from the web panel. Containers sharing the VPN network (`network_mode: "service:vpn"`) maintain their network namespace. The tunnel always runs on a **pinned `tun0` device** (the profile's own `dev` directive is replaced), and every switch fully tears down the previous OpenVPN session first (no stacked processes or stale routes), so the exit IP always matches the selected profile.
+- **Full Tunnel Control (Port 8000)**:
+  - **Restart Tunnel** – reconnect the current profile in place.
+  - **Stop Tunnel** – take the tunnel down on purpose; the gateway tears OpenVPN down, removes the VPN routes, restores container DNS and stays down (auto-restart is suppressed) until you start it again.
+  - **Start Tunnel** – bring a stopped tunnel back up.
+  - Switching profiles, saving credentials or Restart while stopped **re-enables the tunnel** automatically.
+- **Web Control Panel**:
+  - System status indicators with live animated status dots (Container state, Tunnel link, Active profile, Exit IP & location, auto-refresh every 5s).
   - In-browser credential manager (passwords are safely stored and never echoed).
   - Drag-and-drop `.ovpn` profile uploader and multi-profile batch manager.
-  - Live geolocation and IP detection (Country, City, ISP).
+  - Live geolocation and IP detection (Country, City, ISP); cleared on every reconnect so no stale location lingers.
   - Explicit error handling for authentication failures (`AUTH_FAILED`) and TLS handshake issues with previous-session notice banners.
 - **Proof & Verification Page (Port 8080)**:
   - Real-time side-by-side comparison between the internal container exit IP and your host browser IP.
   - Deep geolocation details: Country, City/Region, Organization/ISP, and ASN.
   - Warning banner alerting if outbound traffic is paused or if values are cached from a previous session.
+  - Self-healing IP updater: the updater loop is the container's PID 1 and restarts the container (re-attaching to the fresh tunnel netns) if the network namespace is ever lost; while the tunnel is stopped it shows "Tunnel stopped" instead of leaving stale exit-IP data on the page.
+
+---
+
+## 🎛️ Tunnel Control & State Files
+
+The panel buttons communicate with the gateway through small marker files in the shared `state/` directory (also consumed by the embedded panel inside the vpn container):
+
+| File | Written by | Effect |
+|---|---|---|
+| `selected.ovpn` | panel ("Use as default") | hot-switches the tunnel to that profile |
+| `reload-request` | Restart button / credentials save | reconnects the tunnel (also revives a stopped one) |
+| `tunnel-stop-request` | **Stop Tunnel** | tears the tunnel down and persists the stop |
+| `tunnel-start-request` | **Start Tunnel** | brings the tunnel back up |
+| `tunnel-stopped` | gateway (after a stop) | persists "off" state; blocks auto-restart & healthcheck restart until removed |
+| `current-profile`, `ipinfo.json` | gateway / proof page | active profile name and live exit-IP telemetry |
+
+These persist across container restarts, so a deliberate stop survives `docker restart` and Docker Desktop restarts.
 
 ---
 
@@ -144,7 +208,8 @@ If you cloned the source code repository:
 ├── config/
 │   └── login.conf             # OpenVPN credentials (username on line 1, password on line 2)
 ├── ovpn/                      # Place your downloaded *.ovpn files here
-├── state/                     # Runtime tracking (active profile, connection state, error logs)
+├── state/                     # Runtime tracking (active profile, connection state, error logs,
+│                              #   tunnel stop/start requests, exit-IP telemetry)
 ├── panel/                     # Web control panel code & templates
 ├── vpn/                       # All-in-one Gateway container (Alpine + OpenVPN + Embedded Panel)
 ├── www/                       # Verification proof web server (Nginx)
@@ -167,7 +232,7 @@ To route another service (such as a torrent client, scraper, or curl script) thr
 ```yaml
 services:
   vpn:
-    image: eaeoz/protonvpn-docker:3
+    image: eaeoz/protonvpn-docker:1
     container_name: protonvpn
     cap_add:
       - NET_ADMIN
@@ -193,17 +258,36 @@ services:
 
 ## 📦 Building & Publishing
 
+Images are versioned with the integer tag `1` and always pushed together with `latest`:
+
 ```powershell
-# 1. Build all-in-one image
-docker build -t eaeoz/protonvpn-docker:3 -f vpn/Dockerfile .
+# 1. Build all-in-one image as tag "1"
+docker build -t eaeoz/protonvpn-docker:1 -f vpn/Dockerfile .
 
-# 2. Tag as latest
-docker tag eaeoz/protonvpn-docker:3 eaeoz/protonvpn-docker:latest
+# 2. Build standalone control panel image
+docker build -t eaeoz/protonvpn-docker-panel:1 ./panel
 
-# 3. Push to Docker Hub
-docker push eaeoz/protonvpn-docker:3
+# 3. Build self-contained proof page image
+docker build -t eaeoz/protonvpn-docker-proof:1 -f www/Dockerfile ./www
+
+# 4. Also tag everything as latest
+docker tag eaeoz/protonvpn-docker:1 eaeoz/protonvpn-docker:latest
+docker tag eaeoz/protonvpn-docker-panel:1 eaeoz/protonvpn-docker-panel:latest
+docker tag eaeoz/protonvpn-docker-proof:1 eaeoz/protonvpn-docker-proof:latest
+
+# 5. Push all tags to Docker Hub
+docker push eaeoz/protonvpn-docker:1
 docker push eaeoz/protonvpn-docker:latest
+docker push eaeoz/protonvpn-docker-panel:1
+docker push eaeoz/protonvpn-docker-panel:latest
+docker push eaeoz/protonvpn-docker-proof:1
+docker push eaeoz/protonvpn-docker-proof:latest
 ```
+
+> **Clean republish:** when the remote tags are wiped first (all old tags removed
+> via the Docker Hub API before pushing), only `1` and `latest` remain as the
+> published tags for all three images (`protonvpn-docker`,
+> `protonvpn-docker-panel` and `protonvpn-docker-proof`).
 
 ---
 

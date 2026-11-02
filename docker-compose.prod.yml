@@ -23,7 +23,7 @@ services:
     ports:
       - "8080:80"   # Proof page (web service attaches to vpn netns)
     healthcheck:
-      test: ["CMD-SHELL", "test -f /run/tunnel-up"]
+      test: ["CMD-SHELL", "test -f /run/tunnel-up || test -f /site/state/tunnel-stopped"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -51,16 +51,14 @@ services:
     restart: unless-stopped
 
   # ------------------------------------------------------------------
-  # Proof container: shares VPN network to verify exit IP
+  # Proof container: shares VPN network to verify exit IP.
+  # Fully self-contained image (page + updater baked in).
   # ------------------------------------------------------------------
   web:
-    image: nginx:alpine
+    image: eaeoz/protonvpn-docker-proof:1
     depends_on:
       - vpn
     network_mode: "service:vpn"
     volumes:
-      - ./www:/usr/share/nginx/html
-      - ./www/ipupdate.sh:/etc/ipupdate.sh:ro
-      - ./state:/site/state
-    command: sh /etc/ipupdate.sh
+      - ./state:/site/state      # optional: live "current profile" name
     restart: unless-stopped

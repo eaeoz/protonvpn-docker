@@ -51,11 +51,42 @@ pick_profile() {
 }
 
 # ------------------------------------------------------- start/switch the tunnel
+
+# Stop the previous tunnel session completely. Every profile switch / credential
+# change passes through this, so leftover openvpn processes (and their tun
+# devices + default routes) MUST die here. Otherwise the new session stacks on
+# top of the old one: the stale instance keeps holding the default routes, so
+# traffic keeps exiting through the OLD location, while extra tun devices
+# (tun1, tun2, …) pile up - which also breaks every "tun0" check in the
+# updaters / healthcheck watchdogs.
+stop_tunnel() {
+    [ -f /run/openvpn.pid ] && {
+        OLD="$(cat /run/openvpn.pid 2>/dev/null || true)"
+        [ -n "$OLD" ] && kill "$OLD" 2>/dev/null || true
+        rm -f /run/openvpn.pid
+    }
+    # Belts and braces: kill ANY openvpn instance still alive in this netns
+    # (strays from earlier stacks included).
+    killall openvpn 2>/dev/null || true
+    pkill -x openvpn 2>/dev/null || true
+
+    # Wait for every tun device - and with them every stale route - to vanish.
+    n=0
+    while grep -qs 'tun[0-9]' /proc/net/dev 2>/dev/null && [ "$n" -lt 20 ]; do
+        sleep 1
+        n=$((n + 1))
+    done
+}
+
 start_tunnel() {
     if ! pick_profile; then
         echo "[vpn] WARNING: No .ovpn profile found in $CONFIG_DIR."
         echo "      Web Control Panel is running at http://localhost:8000."
         echo "      Upload a .ovpn profile or save credentials from the UI to establish the tunnel."
+        # No profile: clear runtime state left behind by a previous session so
+        # the proof page no longer shows an old profile name or cached IP data.
+        : > "$STATE_DIR/current-profile"
+        rm -f "$TUNNEL_UP_MARKER"
         return 1
     fi
 
@@ -66,8 +97,15 @@ start_tunnel() {
     # which has no path) with our shared credentials file.
     awk -v cred="$CRED_FILE" '
         /^[ \t]*auth-user-pass/ { print "auth-user-pass " cred; if (!seen) { print "auth-nocache"; seen = 1 }; next }
+        # Drop the dev directive of the profile - a PINNED device name is
+        # appended below so the interface is always "tun0" (otherwise OpenVPN
+        # grabs tun1/tun2 on every switch and every tun0-watcher breaks).
+        /^[ \t]*dev([ \t].*)?$/ { next }
         { print }
     ' "$CONFIG_DIR/$PROFILE" > /tmp/client.conf
+
+    # Pin the tun device name
+    printf '\ndev tun0\n' >> /tmp/client.conf
 
     if [ ! -s /tmp/client.conf ]; then
         echo "[vpn] ERROR: failed to build client config"
@@ -78,39 +116,63 @@ start_tunnel() {
     rm -f "$TUNNEL_UP_MARKER"
     rm -f "$STATE_DIR/tunnel-error.txt"
 
+    # Kill any previous session FIRST (old instance must not keep tun0/routes)
+    stop_tunnel
+
     openvpn --config /tmp/client.conf --verb 3 2>&1 | tee /tmp/openvpn.log &
     OVPN_PID=$!
     echo "$OVPN_PID" > /run/openvpn.pid
 }
 
-# ------------------------------------------------------- profile change watcher
+# ------------------------------------------------------- control watcher
+# Handles: explicit stop/start requests from the panel, profile changes and
+# credentials reloads. A controlled stop persists state/tunnel-stopped, which
+# blocks the auto-restart loop below until an explicit start arrives.
 (
     last="$(cat "$SELECTED" 2>/dev/null | tr -d '\r' || true)"
     while true; do
         sleep 5
-        now="$(cat "$SELECTED" 2>/dev/null | tr -d '\r' || true)"
-        switch_reason=""
-        if [ -n "$now" ] && [ "$now" != "$last" ]; then
-            last="$now"
-            switch_reason="profile changed -> $now, switching tunnel…"
+
+        # ---- STOP request: take the tunnel down and remember we did it
+        if [ -e "$STATE_DIR/tunnel-stop-request" ]; then
+            rm -f "$STATE_DIR/tunnel-stop-request"
+            touch "$STATE_DIR/tunnel-stopped"
+            rm -f "$TUNNEL_UP_MARKER"
+            rm -f "$STATE_DIR/ipinfo.json"
+            echo "[vpn] stop requested - taking the tunnel down…"
+            stop_tunnel
+            # restore Docker's embedded DNS (the tunnel resolver is gone now)
+            [ -f /run/resolv.conf.orig ] && cat /run/resolv.conf.orig > /etc/resolv.conf
+            echo "[vpn] tunnel is stopped - start it from the control panel"
+            continue
+        fi
+
+        action=""
+        resume=""
+        if [ -e "$STATE_DIR/tunnel-start-request" ]; then
+            rm -f "$STATE_DIR/tunnel-start-request"
+            action="start requested"
+            resume=1
         fi
         if [ -e "$STATE_DIR/reload-request" ]; then
             rm -f "$STATE_DIR/reload-request"
-            switch_reason="reload requested (credentials changed), reconnecting…"
+            action="${action:+$action + }reload requested (credentials changed), reconnecting"
+            resume=1
         fi
-        if [ -n "$switch_reason" ]; then
-            echo "[vpn] $switch_reason"
-            # kill the running openvpn (pid file: started by parent start_tunnel)
-            if [ -f /run/openvpn.pid ]; then
-                kill "$(cat /run/openvpn.pid 2>/dev/null)" 2>/dev/null || true
-                # wait for the OLD tun0 to fully disappear before starting the
-                # new session (starting too early triggers route-add races)
-                n=0
-                while grep -q tun0 /proc/net/dev 2>/dev/null && [ "$n" -lt 20 ]; do
-                    sleep 1
-                    n=$((n + 1))
-                done
+        now="$(cat "$SELECTED" 2>/dev/null | tr -d '\r' || true)"
+        if [ -n "$now" ] && [ "$now" != "$last" ]; then
+            last="$now"
+            action="${action:+$action + }profile changed -> $now, switching"
+            resume=1
+        fi
+        if [ -n "$resume" ]; then
+            if [ -e "$STATE_DIR/tunnel-stopped" ]; then
+                echo "[vpn] re-enabling previously stopped tunnel"
             fi
+            rm -f "$STATE_DIR/tunnel-stopped"
+            rm -f "$STATE_DIR/ipinfo.json"   # stale exit-IP data clears with the old session
+            echo "[vpn] $action"
+            stop_tunnel
             start_tunnel
         fi
     done
@@ -121,7 +183,7 @@ start_tunnel() {
 # marker file the healthcheck / panel / proof page look for.
 (
     while true; do
-        if grep -q tun0 /proc/net/dev 2>/dev/null; then
+        if grep -qs 'tun[0-9]' /proc/net/dev 2>/dev/null; then
             if [ ! -f "$TUNNEL_UP_MARKER" ]; then
                 echo "nameserver $TUNNEL_DNS" > /etc/resolv.conf
                 touch "$TUNNEL_UP_MARKER"
@@ -149,7 +211,15 @@ if [ -f /app/app.py ]; then
 fi
 
 # ---------------------------------------------------------------- run
-start_tunnel || true
+# Keep a pristine copy of Docker's embedded DNS config so a controlled stop
+# can restore it (the Proton tunnel resolver only exists while tun0 is up).
+cp /etc/resolv.conf /run/resolv.conf.orig 2>/dev/null || true
+
+if [ -e "$STATE_DIR/tunnel-stopped" ]; then
+    echo "[vpn] tunnel is stopped (state/tunnel-stopped) - start it from the control panel"
+else
+    start_tunnel || true
+fi
 
 # PID1 must NEVER exit: hot-swaps are done by the watcher (which kills/restarts
 # openvpn), so waiting on the first openvpn pid would return and kill the
@@ -157,6 +227,10 @@ start_tunnel || true
 # resident and restart openvpn only if it dies on its own or profile appears.
 while true; do
     sleep 15
+    # Tunnel intentionally stopped from the panel: keep it down, never auto-restart
+    if [ -e "$STATE_DIR/tunnel-stopped" ]; then
+        continue
+    fi
     if [ -f /run/openvpn.pid ]; then
         if ! kill -0 "$(cat /run/openvpn.pid 2>/dev/null)" 2>/dev/null; then
             echo "[vpn] openvpn exited unexpectedly, restarting tunnel…"
