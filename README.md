@@ -2,7 +2,7 @@
 
 A production-ready Dockerized ProtonVPN gateway featuring a **hot-swappable OpenVPN tunnel**, an **embedded Web Control Panel**, and an **independent verification Proof Page** with real-time external IP and geolocation telemetry.
 
-The image `eaeoz/protonvpn-docker:1` is an **All-in-One** container: it bundles both the OpenVPN tunnel and the Web UI. A single `docker run` command starts the VPN tunnel and serves the full interactive dashboard on port 8000!
+The image `eaeoz/protonvpn-docker:1` is an **All-in-One** container: it bundles both the OpenVPN tunnel and the Web UI.
 
 ---
 
