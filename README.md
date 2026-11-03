@@ -341,6 +341,76 @@ docker push eaeoz/protonvpn-docker-proof:latest
 
 ---
 
+## 🧯 Troubleshooting: Windows "ports are not available ... access forbidden" on 8080
+
+When starting the stack on Windows, Docker may refuse to launch the `protonvpn` container with:
+
+```text
+Cannot start Docker Compose application. Reason: compose [start] exit status 1.
+Container protonvpn Starting
+Error response from daemon: ports are not available: exposing port TCP 0.0.0.0:8080 -> 127.0.0.1:0:
+listen tcp 0.0.0.0:8080: bind: An attempt was made to access a socket in a way forbidden by its access permissions.
+```
+
+### Why it happens
+
+Even with nothing listening on 8080 (`netstat -ano | findstr ":8080"` shows no output), the bind is rejected. The culprit is the **Windows NAT Driver (WinNAT)**: it dynamically reserves large blocks of ports at boot (typically whenever Hyper-V / WSL2 / Docker Desktop re-enumerates its NAT), and any port in such a block cannot be bound by Docker - even with administrator rights.
+
+Check which ranges are reserved (run in any shell):
+
+```text
+netsh interface ipv4 show excludedportrange protocol=tcp
+```
+
+Example output where 8080 is swallowed by a reserved range:
+
+```text
+Protocol tcp Port Exclusion Ranges
+
+Start Port    End Port
+----------    --------
+      7997        7996
+      7997        8096     <-- 8080 is in here
+     10100       10199
+      ...
+```
+
+If 8080 falls inside one of these ranges, that is the problem.
+
+### The fix (elevated PowerShell)
+
+Open PowerShell **as Administrator** and run:
+
+```powershell
+# 1. Stop WinNAT so it releases its dynamic port exclusions (incl. the range around 8080)
+net stop winnat
+
+# 2. Permanently reserve port 8080 for Docker (survives reboots)
+netsh int ipv4 add excludedportrange protocol=tcp startport=8080 numberofports=1 store=persistent
+
+# 3. Restart WinNAT
+net start winnat
+```
+
+**What each step does:**
+
+1. **`net stop winnat`** - releases all *dynamic* exclusions WinNAT created at boot. The reserved block that swallowed 8080 disappears (this is safe: WinNAT re-creates its own ranges on start).
+2. **Add excludedportrange with `store=persistent`** - pins port 8080 as an *administered* exclusion. Dynamic ranges can never claim it again, but nothing is actually listening on it, so Docker is free to bind it. The `*` marker in the exclusion list denotes such permanent entries:
+
+   ```text
+   Start Port    End Port
+   ----------    --------
+         8080        8080     *   <-- now permanently reserved for us
+   ```
+
+3. **`net start winnat`** - restarts the NAT driver, which re-reserves its usual ranges *around* the pinned port.
+
+Then `docker compose start` (or `up -d`) works immediately. The reservation persists across reboots, so this is a one-time fix per port. The same recipe works for any other port — it just replaces `startport=8080` (and, for several consecutive ports, changes `numberofports=`).
+
+> **No admin rights available?** The alternative is changing the host side of the port mapping in `docker-compose.yml` to a port outside every reserved range (e.g. `- "8180:80"`), which needs no elevation.
+
+---
+
 ## 🔒 Security Best Practices
 
 - `config/login.conf` and real `.ovpn` files are excluded by default in [`.gitignore`](.gitignore).
