@@ -98,6 +98,63 @@ docker compose up -d
 
 ---
 
+## 🎧 External Compose Project: Deemix Behind the VPN
+
+Containers living in a **separate compose project** (different folder, e.g. `D:\Compose\deemix`) cannot use `service:vpn` or `depends_on` — both only work within one compose file. Instead, reference the gateway by its **container name** with `network_mode: "container:protonvpn"`, and publish the container's UI port through the `vpn` service.
+
+**Step 1** — add the app's port to the `vpn` service of the main `protonvpn-docker` compose (guest ports are only reachable through the vpn container's published ports):
+
+```yaml
+  vpn:
+    image: eaeoz/protonvpn-docker:latest
+    # ... (cap_add, devices, volumes, dns, env as above) ...
+    ports:
+      - "8080:80"     # Proof page (web service attaches to vpn netns)
+      - "6595:6595"   # deemix UI (deemix shares this netns)
+```
+
+**Step 2** — create a standalone compose file in the app's own folder:
+
+```yaml
+# D:\Compose\deemix\docker-compose.yml
+services:
+  deemix:
+    image: registry.gitlab.com/bockiii/deemix-docker:latest
+    container_name: deemix
+    network_mode: "container:protonvpn"
+    # NOTE: depends_on cannot span separate compose projects -
+    # the vpn stack must simply be started first.
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK_SET=022
+      - DEEMIX_SINGLE_USER=true
+    volumes:
+      - ./deemix/config:/config
+      - ./deemix/downloads:/downloads
+    restart: unless-stopped
+```
+
+**Step 3** — start in this order, from each folder:
+
+```bash
+cd /path/to/protonvpn-docker && docker compose up -d   # gateway first
+cd /path/to/deemix           && docker compose up -d   # then the app
+```
+
+- Deemix UI: [http://localhost:6595](http://localhost:6595) - all of its traffic (searches and downloads) exits through the ProtonVPN tunnel.
+- If the `protonvpn` container is ever **recreated** (image update, `up` after config change), re-attach the app once:
+
+```bash
+cd /path/to/deemix && docker compose up -d --force-recreate
+```
+
+> **Why `--force-recreate`?** A recreated vpn container has a fresh network namespace. The old pointer (`network_mode: container:...`) becomes stale, so the attached container must be recreated too - a plain `docker restart` fails with `joining network namespace of container: No such container`.
+
+> This pattern works for any tunnel-attached app (qBittorrent, SABnzbd, radarr, ...): mount nothing extra, just replace the port number in the `ports:` entry of the `vpn` service with the app's own UI port.
+
+---
+
 ## 🔎 Standalone Proof Page (attach to an already-running gateway)
 
 Test your exit IP from any folder, without touching the tunnel. Ships as
